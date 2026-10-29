@@ -1,4 +1,4 @@
--- Daybook initial schema.
+-- Phaestos initial schema.
 --
 -- Conventions used throughout:
 --   * Every user-owned table carries user_id and an RLS policy of

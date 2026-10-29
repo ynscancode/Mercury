@@ -83,13 +83,27 @@ h2 {
   letter-spacing: -0.01em;
 }
 
-.brand i {
-  font-style: normal;
-  background: var(--b-lime);
-  color: var(--on-block);
+/* The wordmark sits on a near-black plate in orange, with a hard orange
+   offset. Those two colours are literal rather than tokens, so the logo is
+   identical in light and dark — the same decision as the block colours. */
+.brand .mark {
+  display: inline-block;
+  background: #17130f;
+  color: #ff7a1a;
   border: 2px solid var(--line);
   border-radius: 6px;
-  padding: 0 6px 2px;
+  padding: 3px 9px 5px;
+  box-shadow: 3px 3px 0 #ff7a1a;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .brand {
+    font-size: 21px;
+  }
+  .brand .mark {
+    padding: 3px 7px 4px;
+  }
 }
 
 /* Buttons press like physical keys: lift on hover, sink on press. */

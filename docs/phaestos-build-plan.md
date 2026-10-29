@@ -1,8 +1,8 @@
-# Daybook — build plan
+# Phaestos — build plan
 
 ## Context
 
-Daybook exists today as a single 1,580-line HTML artifact on claude.ai
+Phaestos exists today as a single 1,580-line HTML artifact on claude.ai
 (`claude.ai/artifact/26RRtWxSkTsQ8LAsjP6cD6`). It is not a sketch — it is a working,
 opinionated task tracker with a complete domain model: automatic priority, calendar-aware
 free-time maths, "start now" pressure detection, estimate-accuracy analytics, live timers,
@@ -16,7 +16,7 @@ connectors, AI fill runs on Claude's sampling quota, the calendar scan is perfor
 in a chat rather than by a job, and the whole app is one unversioned, untested, untyped file
 that cannot run anywhere else.
 
-This plan rebuilds Daybook as a real application in `ynscancode/daybook` (currently an empty
+This plan rebuilds Phaestos as a real application in `ynscancode/daybook` (currently an empty
 repo) at **full feature parity first** (section 1), then adds the capabilities the artifact
 could never have (section 2): a manual escape hatch over automatic priority, priority rules you
 can edit, search, recoverable deletion, a notification engine delivering over both web push and
@@ -81,7 +81,7 @@ Three dates with distinct meanings — **planned start** (when you mean to begin
 finish** (when you aim to be done), **due** (the hard deadline) — each with an optional time
 and sensible defaults (`23:59` for due/target, day-start for planned start).
 
-### Derived logic — the part that makes Daybook Daybook
+### Derived logic — the part that makes Phaestos Phaestos
 - `status()` → todo / doing / done, inferred from `actualStart`, `progress`, `completedAt`.
 - `remMin` = estimate × (1 − progress), `logged` = logged + any running timer.
 - **Automatic priority**, never manual: High when overdue, *or* when remaining estimate ≥ time
@@ -166,7 +166,7 @@ against the model's.
 
 ### Calendar inbox and the morning scan
 Proposed tasks found in the calendar, each with kind (task / unsure / event), title, date,
-category, estimate, recurrence note, source calendar and a reason. Actions: Add to Daybook
+category, estimate, recurrence note, source calendar and a reason. Actions: Add to Phaestos
 (prefills the editor and links `sourceEvent`), Not a task, tick-off, and promoting something
 from the "treated as events" list back to a task. Handled items are never re-flagged.
 Recurring events are summarised rather than proposed individually, and the panel shows when
@@ -341,7 +341,7 @@ instead, 2h") to amend the draft, or tap through to the web editor prefilled.
 timetable. The bot fetches the largest available size, passes it to a vision model, and extracts
 task details. Because one photo often contains several tasks, it proposes a **list** — each item
 individually confirmable, dismissable and editable before it is added. Same gate: nothing enters
-Daybook unconfirmed.
+Phaestos unconfirmed.
 
 **Commands.** A small, memorable set rather than a CLI: `/today`, `/next`, `/overdue`,
 `/done <n>`, `/timer <n>`, `/snooze`, `/link`, `/help`.
@@ -594,7 +594,7 @@ Three implementations behind it:
    is the Apple Account email plus an **app-specific password**, because Apple publishes no
    OAuth calendar API — CalDAV is the only route. Discovery via PROPFIND, then
    `fetchCalendars()` and `fetchCalendarObjects()`, skipping the inbox, outbox and notification
-   collections. Read-only is sufficient: Daybook only consumes events for free/busy.
+   collections. Read-only is sufficient: Phaestos only consumes events for free/busy.
 2. **`icloud-ics` — zero-credential fallback.** Apple's per-calendar public share link, fetched
    and parsed server-side. No credentials at all, but read-only, only for calendars you
    explicitly publish, and Apple refreshes those links lazily (15 minutes to several hours).
@@ -663,7 +663,7 @@ history, not from AI.
 
 ## 4. Phases
 
-Each phase ends with something runnable. Phase 2 is the first point at which Daybook is usable
+Each phase ends with something runnable. Phase 2 is the first point at which Phaestos is usable
 for real work.
 
 | # | Phase | Contents | Done when |

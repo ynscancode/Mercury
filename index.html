@@ -10,7 +10,7 @@
       name="description"
       content="Calendar-aware task tracker that tells you when to start."
     />
-    <title>Daybook</title>
+    <title>Phaestos</title>
     <!-- Applied before first paint so a pinned dark theme never flashes light
          while the bundle loads. Deliberately duplicates the small amount of
          logic in src/lib/theme.ts, which cannot run this early; that module
@@ -18,7 +18,7 @@
     <script>
       (function () {
         try {
-          var v = localStorage.getItem('daybook.theme');
+          var v = localStorage.getItem('phaestos.theme');
           if (v === 'light' || v === 'dark')
             document.documentElement.dataset.theme = v;
         } catch (e) {

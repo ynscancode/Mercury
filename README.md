@@ -1,4 +1,4 @@
-# Daybook
+# Phaestos
 
 A calendar-aware task tracker. It reads your calendar, works out how much time
 you actually have, and tells you which task needs starting now — rather than
@@ -9,8 +9,11 @@ The full design, the capability inventory and the phased build plan live in
 
 ## Status
 
-**Phase 0 — scaffold.** Build pipeline, database schema and authentication are
-in place. The application views arrive in phase 2.
+**Phase 1 — the rules engine.** The domain layer is complete and tested: 237
+unit tests across time zones, the capacity model, priority, attention, the
+capture parser, week load and insights. Phase 0's scaffold, schema and
+authentication are in place beneath it. The application views arrive in
+phase 2.
 
 ## Stack
 
@@ -101,6 +104,20 @@ supabase/
 scripts/       database helpers used by npm run db:test
 docs/          the build plan
 ```
+
+### The rules engine
+
+`src/domain` holds everything that decides what the app says:
+
+| Module        | What it owns                                             |
+| ------------- | -------------------------------------------------------- |
+| `zone.ts`     | wall-clock ↔ instant conversion against an IANA timezone |
+| `task.ts`     | status, the three dates, remaining work, logged time     |
+| `capacity.ts` | porous events, capacity vs schedulability, night reserve |
+| `priority.ts` | automatic and pinned priority, the attention signals     |
+| `capture.ts`  | the one-line parser                                      |
+| `load.ts`     | spreading work across the days that can hold it          |
+| `metrics.ts`  | completion, on-time, estimate accuracy, insight lines    |
 
 `src/domain` is deliberately free of framework imports. The same priority and
 free-time code has to run in the browser and inside a scheduled Edge Function,

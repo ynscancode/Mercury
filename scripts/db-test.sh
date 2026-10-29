@@ -4,7 +4,7 @@
 # rather than by inspection.
 set -euo pipefail
 
-DB="daybook_test_$$"
+DB="phaestos_test_$$"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PSQL=(su postgres -c)
 
