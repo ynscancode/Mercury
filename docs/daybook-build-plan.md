@@ -19,11 +19,12 @@ that cannot run anywhere else.
 This plan rebuilds Daybook as a real application in `ynscancode/daybook` (currently an empty
 repo) at **full feature parity first** (section 1), then adds the capabilities the artifact
 could never have (section 2): a manual escape hatch over automatic priority, priority rules you
-can edit, search, recoverable deletion, a notification engine, and a Telegram bot that both
-delivers alerts and accepts new tasks by text or photo. Decisions already made: React + TypeScript + Vite in this repo; Supabase
+can edit, search, recoverable deletion, a notification engine delivering over both web push and
+Telegram, and a Telegram bot that also accepts new tasks by text or photo. Decisions already made: React + TypeScript + Vite in this repo; Supabase
 for data and auth; Google Calendar, Notion backup, AI fill and the calendar-to-task scan all
 carried over; Apple Calendar preferred over Google if it can be made to work; AI fill built now
-but shipped without an API key; Telegram as the primary notification channel. Nothing from the
+but shipped without an API key; web push to the installed iPhone PWA and Telegram as
+two complementary notification channels. Nothing from the
 artifact's data needs migrating.
 
 One theme runs through section 2. Every new feature is powered by rules the app already
@@ -272,18 +273,36 @@ unchanged inside a scheduled Deno function, so the server can never disagree wit
 whether something is High.
 
 ### 2.6 Channels
-**Telegram as primary**, which is the right instinct:
-- Delivers reliably on iPhone with no Apple push entitlement, no PWA install requirement, and no
-  browser permission prompt that can be lost.
-- Two-way, so the same channel doubles as an input method.
-- Free, with a stable API.
 
-Also planned:
-- **Email**, for the morning digest only — cheap, and a sane fallback if Telegram is down. Not
-  for time-sensitive alerts.
-- **Web push**, as a later addition. Honest caveat: on iOS it works only for a PWA actually
-  added to the home screen, and the permission is easy to lose. Fine as a secondary channel,
-  wrong as the only one.
+Two first-class channels with complementary strengths, plus email for the digest.
+
+**Web push** to the iPhone home-screen PWA. This is the channel that feels like a real app: a
+notification on the lock screen, in Notification Centre, respecting Focus modes, with a count
+badge on the app icon. Tapping it opens straight to the task. Its weakness is that it cannot
+reliably carry **action buttons** on iOS (see 2.8), so it is a glance-and-tap channel.
+
+**Telegram**, which is the opposite: no action-button limitation at all. Inline keyboards work
+perfectly, so this is where **Add / Edit / Discard**, snooze and mark-done live — and it is
+two-way, so it doubles as an input method. It also survives everything that can break a push
+subscription.
+
+So they are not redundant, and the split is deliberate:
+
+| | Web push | Telegram |
+|---|---|---|
+| Lock-screen glance, app badge | ✅ the better channel | — |
+| Deep link into a task | ✅ | ✅ |
+| Buttons on the notification itself | ✗ unreliable on iOS | ✅ inline keyboards |
+| Creating tasks by text or photo | — | ✅ |
+| Survives uninstall, storage eviction, permission loss | ✗ | ✅ |
+
+**Per-type channel routing** in Settings, since the right channel differs by notification: the
+morning digest suits push plus email; an imminent deadline is worth both; priority escalation is
+push-only noise-wise; anything needing a decision (confirm a scanned task, snooze) belongs in
+Telegram where the buttons work.
+
+**Email**, digest only — cheap, and a sane fallback if Telegram is down. Not for time-sensitive
+alerts.
 
 ### 2.7 Telegram bot
 
@@ -321,6 +340,77 @@ Three things to be clear-eyed about:
 - **Rate limits** are roughly one message per second per chat, so the digest and any multi-task
   photo reply must batch into one message rather than firing one per item.
 
+### 2.8 Web push on iOS — the constraints that shape the build
+
+iOS web push works, and has since 16.4, but it is hedged by platform rules that are not
+negotiable. They are listed here because three of them change the design rather than merely
+inconvenience it.
+
+**Installation is mandatory.** Push only exists for a web app added to the Home Screen. In an
+ordinary Safari tab `Notification` is undefined and `pushManager.subscribe()` has no path to a
+subscription. From iOS 26 any site added to the Home Screen with "Open as Web App" enabled (the
+default) qualifies, but the install step is still manual — there is no prompt we can trigger.
+*Design consequence:* the Enable-notifications control only appears when the app detects it is
+running installed (`display-mode: standalone`); in a browser tab it is replaced by
+Add-to-Home-Screen instructions rather than a button that cannot work.
+
+**Permission must come from a real tap.** It has to be requested inside a click handler. Calls
+from `setTimeout`, `DOMContentLoaded` or any automatic code fail — `subscribe()` throws
+`NotAllowedError` and `requestPermission()` resolves to "denied" without ever prompting.
+*Design consequence:* an explicit button, never an on-load prompt. One shot, so the button sits
+behind a short explanation of what will be sent.
+
+**Every push must display a notification — this is the big one.** Subscriptions must be created
+with `userVisibleOnly: true`, and WebKit **revokes an origin's push subscription** after
+repeated pushes that show nothing. That rules out two things:
+- No silent pushes for background data sync. Combined with iOS having no Background Sync,
+  Periodic Background Sync or Background Fetch at all, the offline story stays an offline
+  *shell* — the app cannot quietly refresh itself while closed.
+- **Quiet hours and deduplication must be enforced server-side, before a push is sent.** The
+  tempting client-side design — push arrives, service worker decides whether to show it — is
+  exactly the pattern that gets the subscription revoked. This is why the `notifications_sent`
+  ledger and the quiet-hours window live in `notify-run` and not in the service worker.
+
+**Declarative Web Push** (iOS and iPadOS 18.4+) is the more robust transport and worth using: a
+JSON payload keyed `web_push: 8030` with a `notification` object, displayed **without the
+service worker having to run**. `title` and `navigate` are both required and the message is
+**silently dropped** if either is missing, so the payload builder validates before sending. A tap
+still launches the service worker and dispatches `notificationclick`. The plan sends **one
+payload carrying both shapes** — declarative keys for Safari, which every other browser's push
+handler simply ignores as extra keys — so there is one code path rather than per-browser
+branching.
+
+**Action buttons are the open question.** Declarative payloads appear to accept `actions`, each
+with its own `navigate`, but this is unconfirmed on iOS by any Apple-authored source. The plan
+therefore **does not depend on them**: the primary tap deep-links to the task, which is useful on
+its own, and every interactive affordance (snooze, mark done, confirm a scanned task) is routed
+to Telegram, where inline keyboards are certain. If iOS action buttons prove reliable during
+phase 6, they become a bonus rather than a repair.
+
+**Subscriptions are fragile and must be treated as disposable.** Removing and re-adding the PWA
+invalidates them, and storage can be evicted after long inactivity. So: subscriptions are stored
+per device in `push_subscriptions` (you may install on more than one), the sender **prunes any
+endpoint returning 404 or 410**, and the client verifies its subscription on launch and silently
+re-subscribes if it has gone. Without this a dead endpoint sits there failing forever.
+
+**Smaller facts that still matter.** Payloads cap at roughly 4KB, so a notification carries a
+task id and a deep link rather than task content. Badging via `navigator.setAppBadge()` works but
+only once notification permission is granted — wired to the existing attention count, so the app
+icon shows how many tasks are overdue or need starting. Push is standard VAPID, so no Apple
+developer account or APNs certificate is needed.
+
+**One implementation risk to retire early.** Sending web push means VAPID (an ES256 JWT) plus
+`aes128gcm` payload encryption, and the usual Node library for this is `web-push`, while Supabase
+Edge Functions run Deno. Either it loads cleanly via an `npm:` specifier or the signing and
+encryption get done directly, which is well-documented but fiddly. This gets a spike at the top
+of phase 6, before anything is built on it — it is the one piece of the notification work that
+could need a different home.
+
+*Sourcing note: these behaviours come from WebKit release notes, Apple's WWDC25 Declarative Web
+Push session and several third-party summaries. The install, gesture and `userVisibleOnly` rules
+are consistent across every source; iOS action-button support is the one claim no Apple source
+confirmed, which is why nothing depends on it.*
+
 ---
 
 ## 3. Target architecture
@@ -349,7 +439,8 @@ ynscancode/daybook
 │      ├─ inbox-scan/      calendar → proposed tasks, heuristic-first
 │      ├─ notify-run/      scheduled: evaluate rules, dedupe, dispatch
 │      ├─ notify-digest/   scheduled: morning digest, evening wrap
-│      └─ telegram-hook/   inbound webhook: text, photos, commands, callbacks
+│      ├─ telegram-hook/   inbound webhook: text, photos, commands, callbacks
+│      └─ push-send/       VAPID + aes128gcm; declarative + legacy payload in one
 └─ docs/
 ```
 
@@ -381,9 +472,10 @@ it in Tailwind would cost days and lose the design.
 | `inbox_items` | proposed tasks with kind, reason, status, `task_id` |
 | `scan_state` | last scan time, recurring-event summary |
 | `notion_pending_deletes` | retry queue, promoted out of the settings blob |
-| `notification_prefs` | per-type toggles, digest time, lead times, quiet hours, muted categories |
+| `notification_prefs` | per-type toggles **and per-type channel routing**, digest time, lead times, quiet hours, muted categories |
 | `notifications_sent` | dedupe ledger keyed on task + type + threshold |
 | `telegram_links` | chat_id ↔ user_id binding, link nonces, bound-at |
+| `push_subscriptions` | one row per installed device: endpoint, keys, user agent, last-seen; pruned on 404/410 |
 | `task_drafts` | unconfirmed proposals from the bot, with source (text / photo) and expiry |
 
 Secrets — the Apple app-specific password, the Notion token, the Anthropic key — live in
@@ -476,15 +568,15 @@ for real work.
 |---|---|---|---|
 | 0 | Scaffold | Vite + React + TS, ESLint, Prettier, Vitest, GitHub Actions; Supabase project and local CLI; migrations for every table with RLS; Google sign-in | `npm run dev` serves an authenticated empty shell; `npm test` green |
 | 1 | Domain | Port `task`, `priority`, `freetime`, `capture`, `metrics`, `format` as pure modules, now including **effective priority** (manual override beating auto) and **configurable rules** read from settings rather than hardcoded; **unit tests first** — every priority boundary, attention across the buffer, freeMin against overlapping and all-day events, ~60 capture-parser cases | 100% of the exported domain surface covered; no React or Supabase import anywhere under `domain/` |
-| 2 | Core app | Token CSS, shell, tabs, bottom nav, sheets, toasts; Tasks view with filters, sorting, grouping, rows; **search**; the full editor including the time sanity checker and the **four-way priority control**; **soft delete with double confirmation and undo**; timers with the focus bar and single-timer rule; store, write queue, realtime, offline banner | You can run your real task list on it, and nothing you do is unrecoverable |
+| 2 | Core app | Token CSS, shell, tabs, bottom nav, sheets, toasts; Tasks view with filters, sorting, grouping, rows; **search**; the full editor including the time sanity checker and the **four-way priority control**; **soft delete with double confirmation and undo**; timers with the focus bar and single-timer rule; store, write queue, realtime, offline banner; **PWA manifest, service worker and installability, moved early so it lives on your home screen from here on**; task deep-link routes (`/task/:id`) that notifications will later target | You can install it on your phone and run your real task list on it, and nothing you do is unrecoverable |
 | 3 | Dashboard + Calendar + Settings | Stat strip, focus cards, agenda with the now line, priority panels, week-load bars; week-grid calendar reading `calendar_events`; Settings with categories, **editable priority rules and their live preview**, planning rules, calendar visibility, **Trash** | Dashboard matches the artifact's at identical data; editing a priority rule visibly re-sorts the list |
 | 4 | Calendar sync | `calendar-sync` Edge Function; `icloud-caldav` provider; credential capture and Vault storage; 10-minute schedule; reconnect states; `google` provider behind the same interface | Real iCloud events drive free-time maths end to end |
 | 5 | Insights + archive | All eight KPIs, narrative lines, both charts, the completed table; archive table and its inclusion in metrics; soft-deleted rows excluded everywhere | Figures match hand-computed values on seeded data |
-| 6 | Notifications + Telegram | `notification_prefs`, `notifications_sent`, `telegram_links`; `notify-run` and `notify-digest` on pg_cron; the domain layer running server-side so server and UI always agree; quiet hours, dedupe, snooze; Telegram bot with secret-token webhook verification, nonce binding, outbound delivery, inbound text capture through the shared parser, the Add/Edit/Discard gate, and the command set | A real deadline produces exactly one well-timed message; a task typed into Telegram only lands after you tap Add |
+| 6 | Notifications + both channels | **Opens with the VAPID/`aes128gcm`-in-Deno spike, before anything depends on it.** Then `notification_prefs` (including per-type channel routing), `notifications_sent`, `telegram_links`, `push_subscriptions`; `notify-run` and `notify-digest` on pg_cron; the domain layer running server-side so server and UI never disagree; **quiet hours and dedupe enforced server-side, as iOS requires**; snooze. **Web push**: gesture-gated opt-in shown only when installed, combined declarative + legacy payload, endpoint pruning on 404/410, client-side re-subscribe, app-icon badging from the attention count. **Telegram**: secret-token webhook verification, nonce binding, outbound delivery, inbound text through the shared parser, the Add/Edit/Discard gate, command set | A real deadline produces exactly one well-timed message on the channel you chose; a push arriving in quiet hours was never sent rather than suppressed; a task typed into Telegram only lands after you tap Add |
 | 7 | Notion | `notion-backup` function: batched creates, delta updates, archive-only-after-success, deletion and restoration marking, retry queue, 20-hour auto-run, per-error messaging | A task edited here appears correctly in Notion; a forced failure archives nothing; a restore un-marks it |
 | 8 | Capture + AI | Capture bar with live chips, `fitText` on add, local category guess, keyless estimator; full AI pipeline returning `{disabled:true}`; **Telegram photo intake** with multi-task extraction, per-item confirmation and honest keyless degradation | Every parser format works; adding a key activates AI fill and photo intake with no code change |
 | 9 | Inbox + scan | `inbox_items` and `scan_state`; the inbox panel with add / not-a-task / tick-off / promote-to-task; the `inbox-scan` scheduled job with heuristic classification, stable per-occurrence keys and idempotent re-scans; recurring-event summarisation; optional AI classification when a key exists | A morning scan of a real calendar proposes the right tasks, and re-running it never re-proposes a handled item |
-| 10 | Ship | PWA manifest and service worker, `#add` shortcut, deploy, offline shell; web push as an optional secondary channel | Installs on iPhone; the home-screen shortcut opens capture focused |
+| 10 | Ship | Custom domain, deploy, offline shell hardening, `#add` shortcut, icon set and splash screens; install and notification-permission onboarding | Installs cleanly on iPhone, the home-screen shortcut opens capture focused, and push survives a reinstall |
 
 ### Data migration — not needed
 Confirmed: the artifact holds no tasks worth keeping. No export or import step, and no
@@ -563,6 +655,18 @@ hours queues to the next window rather than being dropped or delivered. Assert p
 escalation fires once per transition, not once per scheduler tick, and that a manually pinned
 task produces no escalation messages. Assert snooze suppresses for exactly its interval. Use a
 frozen clock throughout.
+
+**Web push (phase 6).** Most of this can only be tested on a real iPhone with the app actually
+installed, so it is hands-on rather than automated. Assert the opt-in button is absent in a
+Safari tab and present once installed. Assert permission is granted from a tap and that no
+on-load prompt exists. Then the rule that protects the subscription: assert **every** push the
+server sends results in a visible notification, and that a notification due inside quiet hours
+was never dispatched rather than dispatched-and-hidden — a unit test on `notify-run` plus a
+live check. Assert a declarative payload missing `title` or `navigate` is rejected by the
+builder rather than silently dropped by iOS. Assert tapping a notification deep-links to the
+right task. Remove and re-add the PWA, then assert the stale endpoint is pruned on its next
+404/410 and the client re-subscribes on launch. Assert the app badge matches the attention
+count.
 
 **Telegram (phase 6, 8).** Post a forged update with no secret-token header and assert rejection.
 Post from an unbound chat and assert it is ignored. Send a message with a parseable task and
