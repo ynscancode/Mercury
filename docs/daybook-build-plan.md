@@ -580,3 +580,66 @@ divergence is a bug in the port, not an improvement, unless deliberately noted.
 "IB report, Fri 5pm, ~3h, #school" → assert the parsed chips → save → assert the row's priority
 pill, due chip and fit text → start the timer → assert the focus bar counts down → complete →
 assert the "how long" prompt → assert the Insights completion rate moves.
+
+---
+
+## 7. Hosting and environments
+
+**Frontend on Vercel. All server code in Supabase.** The split is not arbitrary — one platform
+limit decides it.
+
+**Vercel Cron on the Hobby plan runs at most once per day**, sub-daily schedules are rejected at
+deploy time, and even the daily run is only guaranteed within its scheduled hour. Per-minute
+scheduling requires Pro. The notification engine has to evaluate "is anything due in two hours,
+has anything escalated, has a planned start arrived" every few minutes, so Vercel Cron cannot
+drive it on the free plan. Supabase `pg_cron` schedules per-minute on the free tier, which is
+what section 3 already assumed. *(Both figures come from third-party write-ups rather than
+official docs — worth confirming before paying for Pro on the strength of them.)*
+
+Three further reasons to keep the backend in Supabase even where Vercel could host it:
+
+1. **Co-location.** The Supabase project belongs in Singapore (`ap-southeast-1`). Vercel
+   functions default to US East, so a Vercel-hosted route querying the database would cross the
+   Pacific twice per call. Edge Functions run beside the database.
+2. **One secrets store.** The Apple app-specific password, Notion token, Anthropic key and
+   Telegram bot token all live in Supabase Vault — not split across Vault and Vercel env vars.
+3. **Vercel then holds no secrets at all**, only the Supabase anon key, which is public by
+   design and bounded by row-level security.
+
+**Stay on Vite; do not switch to Next.js.** The only reasons to switch are Vercel API routes or
+server rendering, and neither applies: the backend lives in Supabase, and the app is private and
+auth-gated so there is no SEO case. A Vite SPA deploys to Vercel as static output.
+
+**Alternatives considered.** Cloudflare Pages is equivalent for static hosting with a more
+generous free tier, but offers nothing extra once the backend is in Supabase. Netlify is a wash.
+Fly.io or Railway would only earn their keep if a long-running process were needed, and none is.
+Nothing justifies moving off Vercel.
+
+### Environment setup
+
+| Decision | Why it matters now |
+|---|---|
+| **Custom domain from day one** | The quick-add home-screen link and the PWA's identity both bake in the URL. Changing it later breaks every shortcut already added to a phone. |
+| **Separate Telegram bot token for dev** | Otherwise the first scheduler test against seeded data fires a dozen messages into the real chat. Pair it with a second Supabase project for dev and preview. |
+| **Wildcard redirect URL in Supabase Auth** | Vercel preview deployments get unique URLs, and Auth rejects sign-in from any domain not on the allowlist, so previews break without it. |
+| **Keepalive if the project goes quiet** | Supabase pauses a free project after roughly 7 days of inactivity, and a paused database cannot run its own cron to wake itself. Daily use makes this moot; a trivial GitHub Actions ping covers a quiet week. |
+| **Telegram webhook points at Supabase** | The `telegram-hook` function URL, not the Vercel domain — the bot talks to the backend directly. |
+
+### Deployment shape
+
+```
+Vercel (static, global CDN)          Supabase (Singapore)
+├─ Vite SPA build                    ├─ Postgres + RLS + Realtime
+└─ PWA manifest + service worker     ├─ Auth (Google)
+                                     ├─ Vault (every secret)
+                                     ├─ pg_cron + pg_net  → scheduled invocations
+                                     └─ Edge Functions
+                                         calendar-sync · notion-backup · ai-fill
+                                         inbox-scan · notify-run · notify-digest
+                                         telegram-hook
+```
+
+`pg_cron` runs in UTC only, so every schedule is stored in UTC and converted for display
+against your timezone — relevant for the morning digest and quiet hours, which are expressed in
+local time. It also does not retry a failed invocation, so each scheduled function records its
+own run outcome and the next tick picks up anything missed.
