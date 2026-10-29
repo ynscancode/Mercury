@@ -45,6 +45,8 @@ export interface Task {
   estMin: number;
   loggedMin: number;
   progress: number;
+  /** Progress before completion, so un-completing can restore it. */
+  progressBefore: number | null;
 
   actualStart: Instant | null;
   completedAt: Instant | null;

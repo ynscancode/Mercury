@@ -84,6 +84,7 @@ export function makeTask(
     estMin: 0,
     loggedMin: 0,
     progress: 0,
+    progressBefore: null,
     actualStart: null,
     completedAt: null,
     timerStart: null,
@@ -94,3 +95,47 @@ export function makeTask(
     ...partial,
   };
 }
+
+/* ---------- transitions ----------
+   Pure: each returns a new task rather than mutating, so the store can keep a
+   snapshot of the previous value for undo without copying defensively. */
+
+/** Fold a running timer's elapsed time into the logged total. */
+export function withTimerStopped(t: Task, now: Instant): Task {
+  if (t.timerStart == null) return t;
+  const elapsed = Math.max(0, (now - t.timerStart) / 60_000);
+  return { ...t, loggedMin: t.loggedMin + elapsed, timerStart: null };
+}
+
+export function withTimerStarted(t: Task, now: Instant): Task {
+  if (t.timerStart != null) return t;
+  return { ...t, timerStart: now, actualStart: t.actualStart ?? now };
+}
+
+/** Completing stops the clock and backfills a start, so elapsed time is real. */
+export function withCompleted(t: Task, now: Instant): Task {
+  const stopped = withTimerStopped(t, now);
+  return {
+    ...stopped,
+    progressBefore: t.progress < 100 ? t.progress : stopped.progressBefore,
+    progress: 100,
+    completedAt: now,
+    actualStart: stopped.actualStart ?? now,
+  };
+}
+
+/** Un-completing restores the progress the task had before it was finished. */
+export function withUncompleted(t: Task): Task {
+  return {
+    ...t,
+    completedAt: null,
+    progress: Math.min(99, t.progressBefore ?? 0),
+    progressBefore: null,
+  };
+}
+
+export const withSoftDeleted = (t: Task, now: Instant): Task => ({
+  ...t,
+  deletedAt: now,
+});
+export const withRestored = (t: Task): Task => ({ ...t, deletedAt: null });
