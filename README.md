@@ -1,11 +1,11 @@
-# Phaestos
+# Mercury
 
 A calendar-aware task tracker. It reads your calendar, works out how much time
 you actually have, and tells you which task needs starting now — rather than
 just listing what is due.
 
 The full design, the capability inventory and the phased build plan live in
-[`docs/phaestos-build-plan.md`](docs/phaestos-build-plan.md).
+[`docs/mercury-build-plan.md`](docs/mercury-build-plan.md).
 
 ## Status
 

@@ -1,5 +1,5 @@
 /**
- * Domain types for the Phaestos rules engine.
+ * Domain types for the Mercury rules engine.
  *
  * Nothing in `src/domain` imports React, Supabase, or touches the clock: every
  * function that needs the current time takes it as an argument. That is what

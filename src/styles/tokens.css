@@ -1,60 +1,75 @@
-/* Colour-block design tokens, ported from the Phaestos artifact.
-   Chunky Archivo Black headings, flat lime / tomato / yellow / sky blocks,
-   thick ink outlines and hard offset shadows with no blur.
+/* Mercury design tokens, ported from the artifact.
+   Quicksilver and speed: a cool silver-white ground, navy ink, a chrome
+   wordmark, slanted condensed headings, speed-stripe bands on panels, thick
+   outlines and hard offset shadows.
 
-   Two groups of colour behave differently on purpose:
-     * The --b-* block colours stay identical in light and dark. They are the
-       skin's signature, and muting them for dark mode would lose it.
-     * The "-weak" tokens are tints meant to sit under text, so those do flip.
-
-   --line draws every outline and --sh every shadow. They are separate from
-   --rule (hairlines between rows) because in dark mode the outline inverts to
-   near-white while the shadow stays black. */
+   Three groups of colour behave differently on purpose:
+     * The --b-* status blocks and --chrome stay identical in light and dark.
+       They are the skin's signature, and muting them would lose it.
+     * The "-weak" tints sit under text, so those do flip.
+     * --line draws outlines and --sh draws shadows. They are separate from
+       --rule (the hairline between rows) because in dark mode the outline
+       inverts to near-white while the shadow stays black. */
 :root {
-  --bg: #f2ede0;
+  --bg: #eef2f6;
   --surface: #ffffff;
-  --sunken: #ece5d2;
-  --ink: #111111;
-  --muted: #3a3a36;
-  --faint: #6f6a5e;
-  --rule: #111111;
+  --sunken: #e1e7ee;
+  --ink: #0e1726;
+  --muted: #47536a;
+  --faint: #7c879a;
+  --rule: #0e1726;
 
-  --line: #111111;
-  --sh: #111111;
+  --line: #0e1726;
+  --sh: #0e1726;
 
-  --accent: #2e5bff;
-  --accent-weak: #d3ecff;
+  --accent: #2457e6;
+  --accent-weak: #dce6ff;
   --on-accent: #ffffff;
 
-  --mark: #c9f235;
-  --on-mark: #111111;
+  --mark: #5b8cff;
+  --on-mark: #0e1726;
 
-  --over: #d9361f;
-  --over-weak: #ffd6cc;
-  --soon: #7a4e00;
-  --soon-weak: #ffe9a8;
-  --ok: #1c6b34;
-  --ok-weak: #d6f2cb;
+  --over: #c8281f;
+  --over-weak: #fddad6;
+  --soon: #7a5600;
+  --soon-weak: #ffedb8;
+  --ok: #1f6e45;
+  --ok-weak: #d6f0e1;
 
-  /* Block colours: identical in both themes. */
-  --b-lime: #c9f235;
-  --b-tomato: #ee4a2f;
-  --b-yellow: #ffc93c;
-  --b-sky: #9ad4ff;
-  --b-pink: #ffb3a6;
-  --on-block: #111111;
-  --on-tomato: #ffffff;
+  /* Status blocks: overdue is signal red, start-now electric blue, due-soon
+     messenger gold, in-progress quicksilver. Identical in both themes. */
+  --b-start: #5b8cff;
+  --b-over: #f0443a;
+  --b-soon: #ffc93c;
+  --b-doing: #c9d3de;
+  --b-pink: #ffb4aa;
+  --on-block: #0e1726;
+  --on-over: #ffffff;
+
+  /* Brushed metal, used for the wordmark and the in-progress block. */
+  --chrome: linear-gradient(
+    165deg,
+    #ffffff 0%,
+    #dde4ec 38%,
+    #a9b4c2 52%,
+    #eef2f6 70%,
+    #b9c3cf 100%
+  );
+  --brand-bg: #0e1726;
+  --brand-hi: #5b8cff;
 
   --shadow: 4px 4px 0 var(--sh);
   --shadow-s: 3px 3px 0 var(--sh);
-  --scrim: rgba(17, 17, 17, 0.45);
+  --scrim: rgba(14, 23, 38, 0.45);
 
-  --f-display: 'Archivo Black', 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --f-display:
+    'Archivo', 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
   --f-body:
-    'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    'Archivo', 'Archivo Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --r: 8px;
+  --r: 6px;
   color-scheme: light;
 }
 
@@ -62,27 +77,27 @@
    so an explicit light choice still wins, and once for an explicit dark pick. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #1f1e1b;
-    --surface: #2b2a26;
-    --sunken: #36342f;
-    --ink: #f2ede0;
-    --muted: #cfc9ba;
-    --faint: #948e80;
-    --rule: #4a4740;
+    --bg: #0b111c;
+    --surface: #141c2b;
+    --sunken: #1d2738;
+    --ink: #eaf0f6;
+    --muted: #b4c0d0;
+    --faint: #7d8a9e;
+    --rule: #2e3a4f;
 
-    --line: #e9e3d4;
+    --line: #dce4ee;
     --sh: #000000;
 
-    --accent: #8ea8ff;
-    --accent-weak: #1e2b47;
-    --on-accent: #0b1230;
+    --accent: #8eaeff;
+    --accent-weak: #1a2850;
+    --on-accent: #0b111c;
 
-    --over: #ff6b52;
-    --over-weak: #401d16;
-    --soon: #ffc24d;
-    --soon-weak: #3a2d0e;
-    --ok: #6fdb8f;
-    --ok-weak: #17301e;
+    --over: #ff7a70;
+    --over-weak: #3e1513;
+    --soon: #ffd465;
+    --soon-weak: #3a2d07;
+    --ok: #6fd7a0;
+    --ok-weak: #123222;
 
     --scrim: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
@@ -90,27 +105,27 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #1f1e1b;
-  --surface: #2b2a26;
-  --sunken: #36342f;
-  --ink: #f2ede0;
-  --muted: #cfc9ba;
-  --faint: #948e80;
-  --rule: #4a4740;
+  --bg: #0b111c;
+  --surface: #141c2b;
+  --sunken: #1d2738;
+  --ink: #eaf0f6;
+  --muted: #b4c0d0;
+  --faint: #7d8a9e;
+  --rule: #2e3a4f;
 
-  --line: #e9e3d4;
+  --line: #dce4ee;
   --sh: #000000;
 
-  --accent: #8ea8ff;
-  --accent-weak: #1e2b47;
-  --on-accent: #0b1230;
+  --accent: #8eaeff;
+  --accent-weak: #1a2850;
+  --on-accent: #0b111c;
 
-  --over: #ff6b52;
-  --over-weak: #401d16;
-  --soon: #ffc24d;
-  --soon-weak: #3a2d0e;
-  --ok: #6fdb8f;
-  --ok-weak: #17301e;
+  --over: #ff7a70;
+  --over-weak: #3e1513;
+  --soon: #ffd465;
+  --soon-weak: #3a2d07;
+  --ok: #6fd7a0;
+  --ok-weak: #123222;
 
   --scrim: rgba(0, 0, 0, 0.6);
   color-scheme: dark;

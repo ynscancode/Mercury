@@ -6,7 +6,9 @@ import { ThemeControl } from '@/ui/ThemeControl';
 function Brand() {
   return (
     <div className="brand">
-      <span className="mark">Phaestos</span>
+      <span className="mark">
+        <span className="chrome">Mercury</span>
+      </span>
     </div>
   );
 }
@@ -18,7 +20,7 @@ function ConfigNotice({ problems }: { problems: string[] }) {
         <Brand />
         <h1>Almost there</h1>
         <p className="lede">
-          Phaestos needs a Supabase project before it can sign you in or store
+          Mercury needs a Supabase project before it can sign you in or store
           anything.
         </p>
         <div className="banner">
@@ -66,7 +68,7 @@ function SignIn() {
         <Brand />
         <h1>Know what to start</h1>
         <p className="lede">
-          Phaestos reads your calendar, works out how much time you actually
+          Mercury reads your calendar, works out how much time you actually
           have, and tells you which task needs starting now.
         </p>
         <button className="btn primary" onClick={onSignIn} disabled={busy}>

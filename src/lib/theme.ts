@@ -10,7 +10,7 @@
  */
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
-export const THEME_STORAGE_KEY = 'phaestos.theme';
+export const THEME_STORAGE_KEY = 'mercury.theme';
 
 /** Anything with a `dataset`, so this is testable without a DOM. */
 export interface ThemeTarget {

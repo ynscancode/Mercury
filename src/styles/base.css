@@ -48,27 +48,35 @@ button {
   letter-spacing: -0.01em;
 }
 
-/* Archivo Black has one weight, so headings sit at 400 and get their presence
-   from size and uppercasing rather than from boldness. */
+/* Speed type: heavy, narrow and slanted. Archivo is a variable font here, so
+   the condensing comes from font-stretch rather than a separate family. */
 h1,
 h2,
-h3 {
+h3,
+.brand,
+.stat b,
+.kpi b,
+.fcard b {
   font-family: var(--f-display);
-  font-weight: 400;
+  font-style: italic;
+  font-stretch: 68%;
   margin: 0;
   text-wrap: balance;
 }
 
 h1 {
-  font-size: clamp(34px, 7vw, 58px);
-  line-height: 0.98;
-  letter-spacing: -0.01em;
+  font-weight: 900;
+  font-size: clamp(44px, 9vw, 80px);
+  line-height: 0.9;
+  letter-spacing: -0.005em;
   text-transform: uppercase;
 }
 
 h2 {
-  font-size: 17px;
+  font-weight: 900;
+  font-size: 21px;
   line-height: 1.2;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -78,31 +86,39 @@ h2 {
   padding-inline: 16px;
 }
 
+/* The wordmark is brushed metal on a navy plate with an electric-blue offset.
+   The plate and the gradient are fixed in both themes, like the status
+   blocks — a logo that changes colour is not a logo. */
 .brand {
-  font: 400 26px/1 var(--f-display);
-  letter-spacing: -0.01em;
+  font: italic 900 28px/1 var(--f-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-/* The wordmark sits on a near-black plate in orange, with a hard orange
-   offset. Those two colours are literal rather than tokens, so the logo is
-   identical in light and dark — the same decision as the block colours. */
 .brand .mark {
   display: inline-block;
-  background: #17130f;
-  color: #ff7a1a;
+  background: var(--brand-bg);
   border: 2px solid var(--line);
   border-radius: 6px;
-  padding: 3px 9px 5px;
-  box-shadow: 3px 3px 0 #ff7a1a;
-  letter-spacing: 0.01em;
+  padding: 5px 14px 6px 12px;
+  box-shadow: 3px 3px 0 var(--brand-hi);
+}
+
+.brand .chrome {
+  background: var(--chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The italic slant would otherwise clip the final letter. */
+  padding-right: 0.08em;
 }
 
 @media (max-width: 640px) {
   .brand {
-    font-size: 21px;
+    font-size: 22px;
   }
   .brand .mark {
-    padding: 3px 7px 4px;
+    padding: 4px 10px 5px 9px;
   }
 }
 
@@ -134,14 +150,14 @@ h2 {
 }
 
 .btn.primary {
-  background: var(--ink);
+  background: var(--brand-bg);
   border-color: var(--line);
-  color: var(--bg);
-  box-shadow: 3px 3px 0 var(--b-lime);
+  color: #ffffff;
+  box-shadow: 3px 3px 0 var(--brand-hi);
 }
 
 .btn.primary:hover {
-  box-shadow: 4px 4px 0 var(--b-lime);
+  box-shadow: 4px 4px 0 var(--brand-hi);
 }
 
 .btn.ghost {
@@ -173,7 +189,6 @@ h2 {
   }
 }
 
-/* Outlined pills; the selected one fills with ink. */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -183,7 +198,7 @@ h2 {
 .chip {
   border: 2px solid var(--line);
   background: var(--surface);
-  border-radius: 99px;
+  border-radius: 6px;
   padding: 5px 13px;
   font-size: 13px;
   font-weight: 700;
@@ -198,12 +213,20 @@ h2 {
   border-color: var(--line);
 }
 
+/* A speed stripe runs across the top of every panel. */
 .panel {
-  background: var(--surface);
+  background:
+    repeating-linear-gradient(
+        115deg,
+        var(--b-start) 0 3px,
+        transparent 3px 11px
+      )
+      0 9px / 100% 7px no-repeat,
+    var(--surface);
   border: 2.5px solid var(--line);
   border-radius: var(--r);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 30px 16px 16px;
   min-width: 0;
 }
 
@@ -224,9 +247,9 @@ h2 {
 .eyebrow {
   font-size: 11.5px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink);
+  color: var(--accent);
 }
 
 /* Centred single-purpose screens: sign-in, configuration notice, loading. */
@@ -263,10 +286,10 @@ h2 {
 }
 
 .banner {
-  background: var(--b-yellow);
+  background: var(--b-soon);
   color: var(--on-block);
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 600;
