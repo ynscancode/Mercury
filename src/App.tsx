@@ -4,13 +4,7 @@ import { signInWithGoogle, signOut, useSession } from '@/auth/useSession';
 import { ThemeControl } from '@/ui/ThemeControl';
 
 function Brand() {
-  return (
-    <div className="brand">
-      <span className="mark">
-        <span className="chrome">Mercury</span>
-      </span>
-    </div>
-  );
+  return <div className="brand">Mercury</div>;
 }
 
 function ConfigNotice({ problems }: { problems: string[] }) {

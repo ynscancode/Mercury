@@ -1,75 +1,46 @@
 /* Mercury design tokens, ported from the artifact.
-   Quicksilver and speed: a cool silver-white ground, navy ink, a chrome
-   wordmark, slanted condensed headings, speed-stripe bands on panels, thick
-   outlines and hard offset shadows.
+   Quiet, classical, precise: a warm paper-white ground, hairline rules,
+   generous space. Cormorant Garamond for headings and figures, Hanken
+   Grotesk for everything read. One ink-blue accent; status colours appear as
+   text, dots and faint tints, never as blocks.
 
-   Three groups of colour behave differently on purpose:
-     * The --b-* status blocks and --chrome stay identical in light and dark.
-       They are the skin's signature, and muting them would lose it.
-     * The "-weak" tints sit under text, so those do flip.
-     * --line draws outlines and --sh draws shadows. They are separate from
-       --rule (the hairline between rows) because in dark mode the outline
-       inverts to near-white while the shadow stays black. */
+   --f-mono is deliberately not a monospaced face. Numbers line up through
+   `font-variant-numeric: tabular-nums` instead, which keeps the page in one
+   typographic voice rather than switching to a code font for every figure. */
 :root {
-  --bg: #eef2f6;
+  --bg: #f6f5f1;
   --surface: #ffffff;
-  --sunken: #e1e7ee;
-  --ink: #0e1726;
-  --muted: #47536a;
-  --faint: #7c879a;
-  --rule: #0e1726;
+  --sunken: #efede8;
+  --ink: #16181c;
+  --muted: #5d6169;
+  --faint: #9a9da3;
+  --rule: #e3e1db;
 
-  --line: #0e1726;
-  --sh: #0e1726;
-
-  --accent: #2457e6;
-  --accent-weak: #dce6ff;
+  --accent: #24418f;
+  --accent-weak: #eaeef8;
   --on-accent: #ffffff;
 
-  --mark: #5b8cff;
-  --on-mark: #0e1726;
+  --mark: #eaeef8;
+  --on-mark: #24418f;
 
-  --over: #c8281f;
-  --over-weak: #fddad6;
-  --soon: #7a5600;
-  --soon-weak: #ffedb8;
-  --ok: #1f6e45;
-  --ok-weak: #d6f0e1;
+  --over: #b03a2e;
+  --over-weak: #f8e8e5;
+  --soon: #93630f;
+  --soon-weak: #f7f0e1;
+  --ok: #2e6a4b;
+  --ok-weak: #e7f1ea;
+  --doing: #4f6b8c;
 
-  /* Status blocks: overdue is signal red, start-now electric blue, due-soon
-     messenger gold, in-progress quicksilver. Identical in both themes. */
-  --b-start: #5b8cff;
-  --b-over: #f0443a;
-  --b-soon: #ffc93c;
-  --b-doing: #c9d3de;
-  --b-pink: #ffb4aa;
-  --on-block: #0e1726;
-  --on-over: #ffffff;
+  --shadow: 0 1px 2px rgba(22, 24, 28, 0.04), 0 16px 40px rgba(22, 24, 28, 0.1);
+  --scrim: rgba(22, 24, 28, 0.32);
 
-  /* Brushed metal, used for the wordmark and the in-progress block. */
-  --chrome: linear-gradient(
-    165deg,
-    #ffffff 0%,
-    #dde4ec 38%,
-    #a9b4c2 52%,
-    #eef2f6 70%,
-    #b9c3cf 100%
-  );
-  --brand-bg: #0e1726;
-  --brand-hi: #5b8cff;
-
-  --shadow: 4px 4px 0 var(--sh);
-  --shadow-s: 3px 3px 0 var(--sh);
-  --scrim: rgba(14, 23, 38, 0.45);
-
-  --f-display:
-    'Archivo', 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+  --f-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --f-body:
-    'Archivo', 'Archivo Variable', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', sans-serif;
-  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --f-mono: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
 
-  --r: 6px;
+  --r: 2px;
   color-scheme: light;
 }
 
@@ -77,56 +48,58 @@
    so an explicit light choice still wins, and once for an explicit dark pick. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0b111c;
-    --surface: #141c2b;
-    --sunken: #1d2738;
-    --ink: #eaf0f6;
-    --muted: #b4c0d0;
-    --faint: #7d8a9e;
-    --rule: #2e3a4f;
+    --bg: #101113;
+    --surface: #17191c;
+    --sunken: #1f2226;
+    --ink: #ecedee;
+    --muted: #a6aab0;
+    --faint: #6e7279;
+    --rule: #2a2d32;
 
-    --line: #dce4ee;
-    --sh: #000000;
+    --accent: #9fb3ee;
+    --accent-weak: #1c2440;
+    --on-accent: #0f1220;
+    --mark: #1c2440;
+    --on-mark: #b9c8f4;
 
-    --accent: #8eaeff;
-    --accent-weak: #1a2850;
-    --on-accent: #0b111c;
+    --over: #ee8576;
+    --over-weak: #331b18;
+    --soon: #e1b25c;
+    --soon-weak: #2e2614;
+    --ok: #79c79b;
+    --ok-weak: #16271d;
+    --doing: #9db3ce;
 
-    --over: #ff7a70;
-    --over-weak: #3e1513;
-    --soon: #ffd465;
-    --soon-weak: #3a2d07;
-    --ok: #6fd7a0;
-    --ok-weak: #123222;
-
-    --scrim: rgba(0, 0, 0, 0.6);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.5);
+    --scrim: rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #0b111c;
-  --surface: #141c2b;
-  --sunken: #1d2738;
-  --ink: #eaf0f6;
-  --muted: #b4c0d0;
-  --faint: #7d8a9e;
-  --rule: #2e3a4f;
+  --bg: #101113;
+  --surface: #17191c;
+  --sunken: #1f2226;
+  --ink: #ecedee;
+  --muted: #a6aab0;
+  --faint: #6e7279;
+  --rule: #2a2d32;
 
-  --line: #dce4ee;
-  --sh: #000000;
+  --accent: #9fb3ee;
+  --accent-weak: #1c2440;
+  --on-accent: #0f1220;
+  --mark: #1c2440;
+  --on-mark: #b9c8f4;
 
-  --accent: #8eaeff;
-  --accent-weak: #1a2850;
-  --on-accent: #0b111c;
+  --over: #ee8576;
+  --over-weak: #331b18;
+  --soon: #e1b25c;
+  --soon-weak: #2e2614;
+  --ok: #79c79b;
+  --ok-weak: #16271d;
+  --doing: #9db3ce;
 
-  --over: #ff7a70;
-  --over-weak: #3e1513;
-  --soon: #ffd465;
-  --soon-weak: #3a2d07;
-  --ok: #6fd7a0;
-  --ok-weak: #123222;
-
-  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
