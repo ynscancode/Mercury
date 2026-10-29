@@ -16,8 +16,9 @@ connectors, AI fill runs on Claude's sampling quota, the calendar scan is perfor
 in a chat rather than by a job, and the whole app is one unversioned, untested, untyped file
 that cannot run anywhere else.
 
-This plan rebuilds Phaestos as a real application in `ynscancode/Phaestos` (an empty
-repo at the time of writing, then named `daybook`) at **full feature parity first** (section 1), then adds the capabilities the artifact
+This plan rebuilds Phaestos as a real application in `ynscancode/Phaestos` — an empty
+repository at the time of writing, and then still called `daybook` — at **full feature
+parity first** (section 1), then adds the capabilities the artifact
 could never have (section 2): a manual escape hatch over automatic priority, priority rules you
 can edit, search, recoverable deletion, a notification engine delivering over both web push and
 Telegram, and a Telegram bot that also accepts new tasks by text or photo. Decisions already made: React + TypeScript + Vite in this repo; Supabase
