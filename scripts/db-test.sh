@@ -30,8 +30,9 @@ for f in "${ROOT}"/supabase/migrations/*.sql; do
   run "${DB}" "$f"
 done
 
-echo "→ grants"
+echo "→ grants and helpers"
 run "${DB}" "${ROOT}/supabase/test/01_grants.sql"
+run "${DB}" "${ROOT}/supabase/test/01_helpers.sql"
 
 for f in "${ROOT}"/supabase/test/0[2-9]_*.sql; do
   echo "→ $(basename "$f")"

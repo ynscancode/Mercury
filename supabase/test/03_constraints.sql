@@ -1,4 +1,4 @@
--- CHECK-constraint assertions: the client enforces these rules too, but a bug
+-- CHECK-constraint assertions (must_fail comes from 01_helpers.sql): the client enforces these rules too, but a bug
 -- in the client must not be able to persist an impossible task.
 \set ON_ERROR_STOP on
 
@@ -6,16 +6,6 @@ begin;
 insert into auth.users (id, email)
   values ('33333333-3333-3333-3333-333333333333', 'c@example.com');
 
-create or replace function must_fail(stmt text, label text) returns void
-language plpgsql as $$
-begin
-  begin
-    execute stmt;
-    raise exception 'constraint missing: % was accepted', label;
-  exception
-    when check_violation or not_null_violation or unique_violation then null;
-  end;
-end $$;
 
 -- A time with no date.
 select must_fail($$

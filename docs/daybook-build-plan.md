@@ -359,6 +359,89 @@ Three things to be clear-eyed about:
 - **Rate limits** are roughly one message per second per chat, so the digest and any multi-task
   photo reply must batch into one message rather than firing one per item.
 
+### 2.9 The capacity model — two corrections to the artifact's free-time maths
+
+Both of these came out of reviewing the engine against how the day actually works,
+rather than how a calendar describes it. They change what the engine computes, so
+they are settled before the domain layer is written.
+
+#### A calendar event does not block all of its own time
+
+The artifact treats every timed event as fully blocking and every all-day event as not
+blocking at all. Neither extreme survives contact with a real schedule: a 9-to-6 job is a
+single nine-hour event that still contains plenty of usable task time, while an all-day
+"Conference in KL" blocks the day completely and an all-day "Public Holiday" blocks nothing.
+
+Each event therefore carries a **usable fraction** — how much of itself remains available —
+and contributes `duration × (1 − usable_fraction)` of blocked time. Resolution order:
+
+1. A per-event override, set from the calendar or inbox.
+2. A per-calendar default, so a work calendar is configured once rather than per event.
+3. A heuristic, so it is useful with no configuration at all: events at or beyond
+   `long_event_hours` (default 4) are treated as containers and take `long_event_usable`
+   (default 0.30); shorter events block fully; all-day events take `allday_usable`
+   (default 1.00).
+
+The defaults reproduce the artifact's current behaviour exactly for short and all-day
+events, so this generalises rather than changes anything by surprise.
+
+**Capacity is not the same as schedulability, and the split matters.** A porous event
+yields usable *minutes* but no usable *block*, because nothing says which parts of it are
+free. So porous time counts toward "do you have enough hours" (`freeMin`, the load bars,
+priority) but never toward "here is exactly when" (`freeBlocks`, `fitText`, AI slot
+suggestions). Without that split the app would cheerfully promise "fits Thursday
+09:00–12:00" in the middle of a workday meeting.
+
+A separate `capacity_factor` (default 1.00, so opt-in) scales ordinary free time down to
+something a person will really work, since meals, travel and rest live in the gaps a
+calendar does not record.
+
+#### Sleep is reserve, not absence
+
+Night hours must not simply vanish — an all-nighter is a real option and the app should
+know about it. But they must not count as ordinary capacity either, or nothing is urgent
+until a 7am deadline is seven hours away and six of those are spent asleep.
+
+So free time is computed as **two figures**:
+
+- **Ordinary capacity** — waking, unbooked, porosity-adjusted. This drives the start-now
+  trigger, the load bars and everything that asks "is there enough time".
+- **Night reserve** — the hours reachable only by cutting into sleep. Tracked separately,
+  never folded into capacity, and surfaced exactly when it becomes decisive.
+
+The reason strings get materially better as a result:
+
+> Needs 4h. 2h free before you sleep, 9h more if you work through the night.
+
+And the engine gains something it could not previously express: when
+`capacity + reserve < remaining`, the task **cannot be finished even with an all-nighter**.
+The artifact can only ever say "start now"; it has no way to say "this is no longer
+possible, so cut the scope or move the deadline". That is carried as a flag on the existing
+attention signal rather than a new state, keeping the `over` / `start` / `risk` machine
+as it is.
+
+#### The start-now trigger switches basis
+
+Following from both: `attention()` moves off raw wall-clock time
+(`free = (due - now)`) and onto ordinary capacity (`freeMin(now, due)`). Clock time counts
+sleep and meetings as working hours, which is why the trigger currently stays quiet in
+exactly the situations it exists to catch.
+
+Capacity is always smaller than clock time, so the trigger fires **earlier and more often**.
+The default buffer therefore drops from 1.5 to **1.2** — the old multiplier was compensating
+for a measure that was too generous, and keeping both would make everything urgent at once.
+Buffer stays a setting, so it is tunable from the first day of real use.
+
+#### Week-load bars spread work across free blocks
+
+A task's remaining estimate is distributed backwards from its target date into the days
+that actually have capacity, instead of landing entirely on the target day. A 20-hour task
+due Friday currently shows Friday "Over by 12h" with Monday to Thursday empty, which is
+precisely backwards for the multi-session work the engine already detects. The spreading
+logic is also what a future time-blocking feature would need.
+
+---
+
 ### 2.8 Web push on iOS — the constraints that shape the build
 
 iOS web push works, and has since 16.4, but it is hedged by platform rules that are not
@@ -485,9 +568,9 @@ it in Tailwind would cost days and lose the design.
 | `tasks` | the model above plus `priority_mode`, `priority_manual`, `deleted_at`, `last_notified_priority`; `updated_at` trigger; indexes on `(user_id, due)`, `(user_id, completed_at)`, a partial index excluding soft-deleted rows, and a GIN index over title+notes for search |
 | ~~`task_archive`~~ | **Dropped in phase 0.** Archiving exists in the artifact because the claude.ai store had a quota; Postgres does not, and a personal tracker will not outgrow one table. It became an `archived_at` flag on `tasks`, which removes a class of sync bug and makes "archived tasks still count in Insights" true by default rather than by join. `archive_days` now only controls when the flag is set and the row leaves the default views. |
 | `categories` | id, name, colour, sort order |
-| `settings` | one row per user: buffer, highDays, medDays, wakeStart, wakeEnd, archiveDays, hiddenCals, lastBackupAt, lastArchiveRun |
-| `calendar_accounts` | provider (`icloud` / `icloud_ics` / `google`), credential reference in Vault, per-calendar visibility |
-| `calendar_events` | server-maintained event cache: start, end, all_day, title, calendar, busy, provider |
+| `settings` | one row per user: buffer, highDays, medDays, wakeStart, wakeEnd, archiveDays, hiddenCals, lastBackupAt, lastArchiveRun, **capacity model (`long_event_hours`, `long_event_usable`, `allday_usable`, `capacity_factor`, `night_reserve_enabled`)** |
+| `calendar_accounts` | provider (`icloud` / `icloud_ics` / `google`), credential reference in Vault, per-calendar visibility, **default usable fraction** |
+| `calendar_events` | server-maintained event cache: start, end, all_day, title, calendar, busy, provider, **`usable_fraction`** |
 | `inbox_items` | proposed tasks with kind, reason, status, `task_id` |
 | `scan_state` | last scan time, recurring-event summary |
 | `notion_pending_deletes` | retry queue, promoted out of the settings blob |
@@ -586,7 +669,7 @@ for real work.
 | # | Phase | Contents | Done when |
 |---|---|---|---|
 | 0 | Scaffold | Vite + React + TS, ESLint, Prettier, Vitest, GitHub Actions; Supabase project and local CLI; migrations for every table with RLS; Google sign-in | `npm run dev` serves an authenticated empty shell; `npm test` green |
-| 1 | Domain | Port `task`, `priority`, `freetime`, `capture`, `metrics`, `format` as pure modules, now including **effective priority** (manual override beating auto) and **configurable rules** read from settings rather than hardcoded; **unit tests first** — every priority boundary, attention across the buffer, freeMin against overlapping and all-day events, ~60 capture-parser cases | 100% of the exported domain surface covered; no React or Supabase import anywhere under `domain/` |
+| 1 | Domain | Port `task`, `priority`, `freetime`, `capture`, `metrics`, `format` as pure modules, now including **effective priority** (manual override beating auto), **configurable rules** read from settings rather than hardcoded, and **the capacity model of section 2.9** — porous events, capacity versus schedulability, night reserve, and the start-now trigger on capacity rather than clock time; **unit tests first** — every priority boundary, attention across the buffer, freeMin against overlapping and all-day events, ~60 capture-parser cases | 100% of the exported domain surface covered; no React or Supabase import anywhere under `domain/` |
 | 2 | Core app | Token CSS, shell, tabs, bottom nav, sheets, toasts; Tasks view with filters, sorting, grouping, rows; **search**; the full editor including the time sanity checker and the **four-way priority control**; **soft delete with double confirmation and undo**; timers with the focus bar and single-timer rule; store, write queue, realtime, offline banner; **PWA manifest, service worker and installability, moved early so it lives on your home screen from here on**; task deep-link routes (`/task/:id`) that notifications will later target | You can install it on your phone and run your real task list on it, and nothing you do is unrecoverable |
 | 3 | Dashboard + Calendar + Settings | Stat strip, focus cards, agenda with the now line, priority panels, week-load bars; week-grid calendar reading `calendar_events`; Settings with categories, **editable priority rules and their live preview**, planning rules, calendar visibility, **Trash** | Dashboard matches the artifact's at identical data; editing a priority rule visibly re-sorts the list |
 | 4 | Calendar sync | `calendar-sync` Edge Function; `icloud-caldav` provider; credential capture and Vault storage; 10-minute schedule; reconnect states; `google` provider behind the same interface | Real iCloud events drive free-time maths end to end |
