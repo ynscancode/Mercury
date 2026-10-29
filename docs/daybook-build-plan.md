@@ -19,9 +19,9 @@ that cannot run anywhere else.
 This plan rebuilds Daybook as a real application in `ynscancode/daybook` (currently an empty
 repo) at **full feature parity first**, then opens the door to the capabilities the artifact
 could never have. Decisions already made: React + TypeScript + Vite in this repo; Supabase
-for data and auth; Google Calendar, Notion backup and AI fill all carried over; Apple
-Calendar preferred over Google if it can be made to work; AI fill built now but shipped
-without an API key.
+for data and auth; Google Calendar, Notion backup, AI fill and the
+calendar-to-task scan all carried over; Apple Calendar preferred over Google if it can be made
+to work; AI fill built now but shipped without an API key.
 
 ---
 
@@ -135,11 +135,18 @@ target not after due, neither in the past). AI-filled fields are tinted yellow a
 degradation when AI is unavailable. `estSource` is recorded so Insights can score your estimates
 against the model's.
 
-### Calendar inbox
+### Calendar inbox and the morning scan
 Proposed tasks found in the calendar, each with kind (task / unsure / event), title, date,
 category, estimate, recurrence note, source calendar and a reason. Actions: Add to Daybook
 (prefills the editor and links `sourceEvent`), Not a task, tick-off, and promoting something
 from the "treated as events" list back to a task. Handled items are never re-flagged.
+Recurring events are summarised rather than proposed individually, and the panel shows when
+the last scan ran.
+
+In the artifact the scan is not code — Claude reads the calendar in a chat and writes
+`scanstate` and `inbox` rows into the artifact store by hand. In the real build it becomes a
+scheduled job (see `inbox-scan` below), which is the one capability that gets genuinely more
+capable in the port rather than merely ported.
 
 ### Settings
 Categories — add, rename inline, pick from an 8-colour palette, delete with automatic
@@ -256,6 +263,37 @@ it, the artifact's awkward split between "live Google" and "stale iCloud snapsho
 13 Oct" disappears. There is one event source, always server-fresh, and the `srctag` /
 snapshot-provenance UI can go.
 
+### The inbox scan
+
+`inbox-scan` runs daily, after `calendar-sync` has refreshed `calendar_events`, and classifies
+each upcoming event into task / unsure / event. Classification is **heuristic first, with AI as
+an optional enhancement** — the same posture as capture, so the scan works from day one with no
+API key:
+
+- **Rejected as events** — anything recurring (standing meetings, classes, lectures, gym),
+  anything whose attendee count or organiser marks it as someone else's meeting, all-day
+  informational entries (holidays, birthdays, travel), and any transparent / free-marked event.
+- **Proposed as tasks** — imperative or deliverable-shaped titles ("Submit IB report",
+  "Q3 deck due", "Essay deadline"), events whose title carries a deadline word
+  (due / submit / deadline / hand in / dateline), and short solo entries that read as
+  reminders rather than meetings.
+- **Flagged unsure** — everything plausible but ambiguous, surfaced with the reason that
+  triggered it so a single tap resolves it.
+- **Estimates and categories** reuse existing logic: the keyless estimator's median of similar
+  past tasks for duration, and `guessCatLocal` word overlap for category, with the event's own
+  duration as a floor.
+- **Idempotency** is the thing to get right. Each item is keyed on a stable event identity
+  (provider UID plus occurrence date), so re-scanning never re-proposes something you already
+  ticked off, added or dismissed. Status (`open` / `added` / `dismissed` / `event`) persists per
+  key, and the artifact's promise — "ticked items aren't flagged again" — holds across every
+  future scan.
+- **With an API key present**, the same event batch is additionally passed to the model for
+  classification and titling, which mainly improves the unsure bucket and turns calendar
+  shorthand into clean task titles. Without one, the heuristics stand alone.
+
+The job writes `inbox_items` and `scan_state`; the client subscribes to both, so the panel
+appears without a refresh.
+
 ### AI fill without a key
 
 The entire pipeline gets built — prompt construction with free slots and similar past tasks,
@@ -286,14 +324,13 @@ for real work.
 | 5 | Insights + archive | All eight KPIs, narrative lines, both charts, the completed table; archive table and its inclusion in metrics | Figures match hand-computed values on seeded data |
 | 6 | Notion | `notion-backup` function: batched creates, delta updates, archive-only-after-success, deletion marking, retry queue, 20-hour auto-run, per-error messaging | A task edited here appears correctly in Notion; a forced failure archives nothing |
 | 7 | Capture + AI | Capture bar with live chips, `fitText` on add, local category guess, keyless estimator; full AI pipeline returning `{disabled:true}` | Every parser format works; adding a key activates AI with no code change |
-| 8 | Inbox *(deferred)* | `inbox_items` UI and the `inbox-scan` job — **you did not select this; planned but not scheduled** | On request |
+| 8 | Inbox + scan | `inbox_items` and `scan_state` tables; the inbox panel with add / not-a-task / tick-off / promote-to-task; the `inbox-scan` scheduled job with heuristic classification, stable per-occurrence keys and idempotent re-scans; recurring-event summarisation; optional AI classification when a key exists | A morning scan of a real calendar proposes the right tasks, and re-running it never re-proposes a handled item |
 | 9 | Ship | PWA manifest and service worker, `#add` shortcut, deploy, offline shell | Installs on iPhone; the home-screen shortcut opens capture focused |
 
-### Data migration
-If the artifact holds tasks you care about, phase 0 should include a one-time export: add a
-"Download my data" button to the artifact that dumps tasks, settings and archive to JSON, then
-an `npm run import` script that maps it into Supabase. Worth confirming before phase 0 —
-if the current data is only the five example tasks, this is skippable.
+### Data migration — not needed
+Confirmed: the artifact holds no tasks worth keeping. No export or import step, and no
+migration script. The new app starts from an empty database, and the 5-task example loader
+(itself part of parity) covers any need for demo data.
 
 ---
 
@@ -343,6 +380,12 @@ the 10-minute refresh picks up an event added on the phone.
 failure — revoke the token mid-run — and assert that **nothing was archived** and that the
 error message names the cause. Delete a task offline and confirm the pending-delete queue
 retries.
+
+**Inbox scan (phase 8).** Against a real calendar week: assert that recurring entries, holidays
+and other people's meetings are not proposed, and that deadline-shaped entries are. Then the
+idempotency test that matters most — tick off, add and dismiss one item each, re-run the scan,
+and assert none of the three reappears and that `scan_state` advances. Re-run again with an
+event's time changed and assert it is treated as the same occurrence, not a new proposal.
 
 **Parity (before shipping).** Load identical data into both the artifact and the new app side by
 side and compare, screen by screen: the stat strip, each dashboard panel's membership and order,
