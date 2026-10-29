@@ -11,11 +11,26 @@
       content="Calendar-aware task tracker that tells you when to start."
     />
     <title>Daybook</title>
+    <!-- Applied before first paint so a pinned dark theme never flashes light
+         while the bundle loads. Deliberately duplicates the small amount of
+         logic in src/lib/theme.ts, which cannot run this early; that module
+         owns every other read and write, and its tests cover these same rules. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem('daybook.theme');
+          if (v === 'light' || v === 'dark')
+            document.documentElement.dataset.theme = v;
+        } catch (e) {
+          /* private browsing: fall through to the device preference */
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
     />
   </head>
   <body>

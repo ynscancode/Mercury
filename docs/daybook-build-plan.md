@@ -43,7 +43,9 @@ read off the artifact source. Nothing here is optional.
 ### Shell and interaction
 - Four views — Dashboard, Tasks, Calendar, Insights — with the active tab persisted.
 - Top tab bar on desktop; fixed bottom navigation on phones, with safe-area insets.
-- Light and dark themes via `prefers-color-scheme`, overridable by `data-theme`.
+- **Appearance control: Match device / Light / Dark**, stored per device in `localStorage`
+  rather than synced, so a phone used at night and a laptop at a desk can differ. `auto`
+  removes the attribute so `prefers-color-scheme` takes over; the other two pin it.
 - Header sync status line that names the live state ("Google Calendar live · 14:32",
   "Calendar snapshot Mon 13 Oct", "Not saving") plus a manual Refresh.
 - Modal bottom sheets with focus trapping, Escape, backdrop dismissal.
@@ -52,6 +54,23 @@ read off the artifact source. Nothing here is optional.
 - A 1-second tick for running timers and a 5-minute silent re-render so relative times
   ("in 3h", "2d overdue") never go stale.
 - Re-render preserves in-progress input values, focus and text selection.
+
+### Design system — "colour block"
+The artifact was reskinned, so the visual language is now: **Archivo Black** headings, set
+uppercase and tight; **Archivo** for body; JetBrains Mono for every figure. Flat
+lime / tomato / yellow / sky / pink blocks, thick ink outlines (2–2.5px) and **hard offset
+shadows with no blur**. Buttons press like physical keys — lifting on hover, sinking on
+press — and the primary button throws a lime shadow instead of a grey one.
+
+Two groups of colour behave differently on purpose, and the port must preserve the
+distinction: the `--b-*` block colours are **identical in light and dark**, because they are
+the skin's signature; the `-weak` tints, which sit under text, do flip. A separate `--line`
+and `--sh` pair draws outlines and shadows, because in dark mode the outline inverts to
+near-white while the shadow stays black — so they cannot share a token with `--rule`, which
+is the hairline between rows.
+
+Consequence for phase 5: chart marks carry ink outlines (`stroke: var(--line)`), so the
+Insights charts are drawn as outlined blocks rather than flat fills.
 
 ### Task model
 `id, title, cat, notes, createdAt, updatedAt, plannedStart(+Time), target(+Time), due(+Time),

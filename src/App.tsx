@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { configResult } from '@/lib/supabase';
 import { signInWithGoogle, signOut, useSession } from '@/auth/useSession';
+import { ThemeControl } from '@/ui/ThemeControl';
 
 function Brand() {
   return (
@@ -72,6 +73,12 @@ function SignIn() {
           {busy ? 'Opening Google…' : 'Continue with Google'}
         </button>
         {error ? <div className="banner">{error}</div> : null}
+        <div style={{ marginTop: 6 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            Appearance
+          </div>
+          <ThemeControl />
+        </div>
       </div>
     </div>
   );
@@ -102,6 +109,15 @@ function AppShell({ email }: { email: string | undefined }) {
             Signed in as {email ?? 'an unknown account'}. The schema, auth and
             build pipeline are in place. Views arrive in phase 2.
           </p>
+          <div style={{ marginTop: 16 }}>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              Appearance
+            </div>
+            <ThemeControl />
+            <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
+              Saved on this device only.
+            </p>
+          </div>
         </section>
       </main>
     </div>

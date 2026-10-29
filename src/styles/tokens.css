@@ -1,98 +1,117 @@
-/* Semantic design tokens, ported from the Daybook artifact.
-   Dark mode is defined twice on purpose: once under prefers-color-scheme for
-   people who never touch the setting, guarded so an explicit light choice wins,
-   and once under [data-theme="dark"] for an explicit choice. */
-:root {
-  --bg: #edefeb;
-  --surface: #ffffff;
-  --sunken: #e3e6e1;
-  --ink: #15181b;
-  --muted: #576068;
-  --faint: #8a9097;
-  --rule: #d5d9d3;
+/* Colour-block design tokens, ported from the Daybook artifact.
+   Chunky Archivo Black headings, flat lime / tomato / yellow / sky blocks,
+   thick ink outlines and hard offset shadows with no blur.
 
-  --accent: #2b42b0;
-  --accent-weak: #e1e5f7;
+   Two groups of colour behave differently on purpose:
+     * The --b-* block colours stay identical in light and dark. They are the
+       skin's signature, and muting them for dark mode would lose it.
+     * The "-weak" tokens are tints meant to sit under text, so those do flip.
+
+   --line draws every outline and --sh every shadow. They are separate from
+   --rule (hairlines between rows) because in dark mode the outline inverts to
+   near-white while the shadow stays black. */
+:root {
+  --bg: #f2ede0;
+  --surface: #ffffff;
+  --sunken: #ece5d2;
+  --ink: #111111;
+  --muted: #3a3a36;
+  --faint: #6f6a5e;
+  --rule: #111111;
+
+  --line: #111111;
+  --sh: #111111;
+
+  --accent: #2e5bff;
+  --accent-weak: #d3ecff;
   --on-accent: #ffffff;
 
-  /* Highlighter yellow marks "today" and "start now" — the one loud colour. */
-  --mark: #f2d64a;
-  --on-mark: #17191c;
+  --mark: #c9f235;
+  --on-mark: #111111;
 
-  --over: #b3342a;
-  --over-weak: #f7e1de;
-  --soon: #94610e;
-  --soon-weak: #f5ead2;
-  --ok: #1d7a4f;
-  --ok-weak: #dbefe3;
+  --over: #d9361f;
+  --over-weak: #ffd6cc;
+  --soon: #7a4e00;
+  --soon-weak: #ffe9a8;
+  --ok: #1c6b34;
+  --ok-weak: #d6f2cb;
 
-  --shadow: 0 1px 2px rgba(20, 24, 28, 0.06), 0 8px 28px rgba(20, 24, 28, 0.1);
-  --scrim: rgba(18, 20, 22, 0.38);
+  /* Block colours: identical in both themes. */
+  --b-lime: #c9f235;
+  --b-tomato: #ee4a2f;
+  --b-yellow: #ffc93c;
+  --b-sky: #9ad4ff;
+  --b-pink: #ffb3a6;
+  --on-block: #111111;
+  --on-tomato: #ffffff;
 
-  --f-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --shadow: 4px 4px 0 var(--sh);
+  --shadow-s: 3px 3px 0 var(--sh);
+  --scrim: rgba(17, 17, 17, 0.45);
+
+  --f-display: 'Archivo Black', 'Archivo', ui-sans-serif, system-ui, sans-serif;
   --f-body:
-    'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    sans-serif;
+    'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --r: 10px;
+  --r: 8px;
   color-scheme: light;
 }
 
+/* Dark is declared twice: once for people who never touch the setting, guarded
+   so an explicit light choice still wins, and once for an explicit dark pick. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #111315;
-    --surface: #191c1f;
-    --sunken: #22262a;
-    --ink: #e7e9eb;
-    --muted: #a1a8af;
-    --faint: #6e757c;
-    --rule: #2c3136;
+    --bg: #1f1e1b;
+    --surface: #2b2a26;
+    --sunken: #36342f;
+    --ink: #f2ede0;
+    --muted: #cfc9ba;
+    --faint: #948e80;
+    --rule: #4a4740;
 
-    --accent: #93a5f6;
-    --accent-weak: #232a4a;
-    --on-accent: #0f1220;
+    --line: #e9e3d4;
+    --sh: #000000;
 
-    --mark: #e4c83f;
-    --on-mark: #17191c;
+    --accent: #8ea8ff;
+    --accent-weak: #1e2b47;
+    --on-accent: #0b1230;
 
-    --over: #f2806f;
-    --over-weak: #3a1f1c;
-    --soon: #e6ae52;
-    --soon-weak: #362a15;
-    --ok: #5dc68f;
-    --ok-weak: #16301f;
+    --over: #ff6b52;
+    --over-weak: #401d16;
+    --soon: #ffc24d;
+    --soon-weak: #3a2d0e;
+    --ok: #6fdb8f;
+    --ok-weak: #17301e;
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
-    --scrim: rgba(0, 0, 0, 0.55);
+    --scrim: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --bg: #111315;
-  --surface: #191c1f;
-  --sunken: #22262a;
-  --ink: #e7e9eb;
-  --muted: #a1a8af;
-  --faint: #6e757c;
-  --rule: #2c3136;
+  --bg: #1f1e1b;
+  --surface: #2b2a26;
+  --sunken: #36342f;
+  --ink: #f2ede0;
+  --muted: #cfc9ba;
+  --faint: #948e80;
+  --rule: #4a4740;
 
-  --accent: #93a5f6;
-  --accent-weak: #232a4a;
-  --on-accent: #0f1220;
+  --line: #e9e3d4;
+  --sh: #000000;
 
-  --mark: #e4c83f;
-  --on-mark: #17191c;
+  --accent: #8ea8ff;
+  --accent-weak: #1e2b47;
+  --on-accent: #0b1230;
 
-  --over: #f2806f;
-  --over-weak: #3a1f1c;
-  --soon: #e6ae52;
-  --soon-weak: #362a15;
-  --ok: #5dc68f;
-  --ok-weak: #16301f;
+  --over: #ff6b52;
+  --over-weak: #401d16;
+  --soon: #ffc24d;
+  --soon-weak: #3a2d0e;
+  --ok: #6fdb8f;
+  --ok-weak: #17301e;
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
-  --scrim: rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
