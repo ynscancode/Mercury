@@ -464,7 +464,7 @@ it in Tailwind would cost days and lose the design.
 | Table | Purpose |
 |---|---|
 | `tasks` | the model above plus `priority_mode`, `priority_manual`, `deleted_at`, `last_notified_priority`; `updated_at` trigger; indexes on `(user_id, due)`, `(user_id, completed_at)`, a partial index excluding soft-deleted rows, and a GIN index over title+notes for search |
-| `task_archive` | completed tasks past the threshold; still queried by Insights |
+| ~~`task_archive`~~ | **Dropped in phase 0.** Archiving exists in the artifact because the claude.ai store had a quota; Postgres does not, and a personal tracker will not outgrow one table. It became an `archived_at` flag on `tasks`, which removes a class of sync bug and makes "archived tasks still count in Insights" true by default rather than by join. `archive_days` now only controls when the flag is set and the row leaves the default views. |
 | `categories` | id, name, colour, sort order |
 | `settings` | one row per user: buffer, highDays, medDays, wakeStart, wakeEnd, archiveDays, hiddenCals, lastBackupAt, lastArchiveRun |
 | `calendar_accounts` | provider (`icloud` / `icloud_ics` / `google`), credential reference in Vault, per-calendar visibility |

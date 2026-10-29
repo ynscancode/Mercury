@@ -1,0 +1,98 @@
+/* Semantic design tokens, ported from the Daybook artifact.
+   Dark mode is defined twice on purpose: once under prefers-color-scheme for
+   people who never touch the setting, guarded so an explicit light choice wins,
+   and once under [data-theme="dark"] for an explicit choice. */
+:root {
+  --bg: #edefeb;
+  --surface: #ffffff;
+  --sunken: #e3e6e1;
+  --ink: #15181b;
+  --muted: #576068;
+  --faint: #8a9097;
+  --rule: #d5d9d3;
+
+  --accent: #2b42b0;
+  --accent-weak: #e1e5f7;
+  --on-accent: #ffffff;
+
+  /* Highlighter yellow marks "today" and "start now" — the one loud colour. */
+  --mark: #f2d64a;
+  --on-mark: #17191c;
+
+  --over: #b3342a;
+  --over-weak: #f7e1de;
+  --soon: #94610e;
+  --soon-weak: #f5ead2;
+  --ok: #1d7a4f;
+  --ok-weak: #dbefe3;
+
+  --shadow: 0 1px 2px rgba(20, 24, 28, 0.06), 0 8px 28px rgba(20, 24, 28, 0.1);
+  --scrim: rgba(18, 20, 22, 0.38);
+
+  --f-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --f-body:
+    'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --r: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #111315;
+    --surface: #191c1f;
+    --sunken: #22262a;
+    --ink: #e7e9eb;
+    --muted: #a1a8af;
+    --faint: #6e757c;
+    --rule: #2c3136;
+
+    --accent: #93a5f6;
+    --accent-weak: #232a4a;
+    --on-accent: #0f1220;
+
+    --mark: #e4c83f;
+    --on-mark: #17191c;
+
+    --over: #f2806f;
+    --over-weak: #3a1f1c;
+    --soon: #e6ae52;
+    --soon-weak: #362a15;
+    --ok: #5dc68f;
+    --ok-weak: #16301f;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
+    --scrim: rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #111315;
+  --surface: #191c1f;
+  --sunken: #22262a;
+  --ink: #e7e9eb;
+  --muted: #a1a8af;
+  --faint: #6e757c;
+  --rule: #2c3136;
+
+  --accent: #93a5f6;
+  --accent-weak: #232a4a;
+  --on-accent: #0f1220;
+
+  --mark: #e4c83f;
+  --on-mark: #17191c;
+
+  --over: #f2806f;
+  --over-weak: #3a1f1c;
+  --soon: #e6ae52;
+  --soon-weak: #362a15;
+  --ok: #5dc68f;
+  --ok-weak: #16301f;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
