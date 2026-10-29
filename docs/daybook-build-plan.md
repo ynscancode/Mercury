@@ -17,11 +17,20 @@ in a chat rather than by a job, and the whole app is one unversioned, untested, 
 that cannot run anywhere else.
 
 This plan rebuilds Daybook as a real application in `ynscancode/daybook` (currently an empty
-repo) at **full feature parity first**, then opens the door to the capabilities the artifact
-could never have. Decisions already made: React + TypeScript + Vite in this repo; Supabase
-for data and auth; Google Calendar, Notion backup, AI fill and the
-calendar-to-task scan all carried over; Apple Calendar preferred over Google if it can be made
-to work; AI fill built now but shipped without an API key.
+repo) at **full feature parity first** (section 1), then adds the capabilities the artifact
+could never have (section 2): a manual escape hatch over automatic priority, priority rules you
+can edit, search, recoverable deletion, a notification engine, and a Telegram bot that both
+delivers alerts and accepts new tasks by text or photo. Decisions already made: React + TypeScript + Vite in this repo; Supabase
+for data and auth; Google Calendar, Notion backup, AI fill and the calendar-to-task scan all
+carried over; Apple Calendar preferred over Google if it can be made to work; AI fill built now
+but shipped without an API key; Telegram as the primary notification channel. Nothing from the
+artifact's data needs migrating.
+
+One theme runs through section 2. Every new feature is powered by rules the app already
+computes — priority, attention, free time, capacity — so the work is mostly about **surfacing
+and persisting** what the engine already knows, not inventing new logic. The exceptions are
+photo intake, which needs a vision model, and the dedupe ledger, which is genuinely new
+machinery.
 
 ---
 
@@ -172,7 +181,149 @@ per 20 hours, 6 seconds after load. Every error code maps to a specific sentence
 
 ---
 
-## 2. Target architecture
+## 2. Additions beyond the artifact
+
+Section 1 is parity. This section is new capability, and it changes the shape of the build in
+three places: priority stops being purely derived, deletion stops being destructive, and the
+app gains a server-side scheduler plus a second front end in the form of a Telegram bot.
+
+### 2.1 Manual priority override
+- `priorityMode` per task — `auto` (the default) or `manual`.
+- When manual, `priorityManual` holds High / Medium / Low and wins everywhere priority is
+  used: rows, sorting, grouping, Notion, notifications.
+- The editor's priority box becomes a four-way control: **Auto** (showing the computed level
+  and its reason) · High · Med · Low.
+- Pinning a level keeps the computed one visible as "Auto would say Medium", so overriding
+  never costs you the information.
+- A pinned task carries a small marker on its priority pill, so you can see at a glance that it
+  is no longer tracking its deadline. One tap returns it to Auto.
+- Consequence worth knowing: a pinned task will not escalate on its own. Overdue and at-risk
+  detection still fire, since those are separate signals, but the pill stops moving. The marker
+  exists so this never surprises you.
+
+### 2.2 Editable priority rules
+Today the day thresholds are editable and the rest is hardcoded. All of it moves into Settings:
+- High if due within N days · Medium if due within N days · start-now buffer multiplier
+  (these three already exist).
+- **Toggle:** escalate to High when the remaining estimate no longer fits before the deadline.
+- **Toggle:** overdue is always High.
+- **Choice:** what a task with no due date gets — Low, Medium, or no priority at all.
+- A live preview in Settings showing how many of your current tasks would sit at each level
+  under the edited rules, so the effect is visible before you save.
+
+Deliberately *not* building a general rules builder — per-category weights, custom expressions,
+boolean conditions. That is a large UI for a personal tracker, and the six controls above cover
+the real cases. Easy to extend later if it turns out they do not.
+
+### 2.3 Search
+- Instant and as-you-type, across title, notes and category.
+- `/` or Cmd/Ctrl-K focuses it from anywhere.
+- Open tasks are searched client-side with no round trip; the query extends to completed and
+  archived tasks server-side, using Postgres full-text plus trigram matching so typos and
+  partial words still hit.
+- Scope toggle: open only, or everything including the archive.
+- Results use the row rendering you already know — priority, countdowns, attention reason.
+- Escape clears and restores your previous filters.
+
+### 2.4 Undo and safe deletion
+- Deletion becomes **soft** — a `deletedAt` timestamp. Deleted tasks disappear from every view
+  and from all Insights figures, but the row survives.
+- **Double confirmation**, as asked: the Delete button arms on first tap, then a dialog names
+  the task and states what will happen before anything is removed.
+- An **Undo** toast immediately afterwards, restoring in one tap.
+- A **Trash** list in Settings holding everything deleted in the last 30 days, with Restore and
+  Delete permanently.
+- Hard deletion after 30 days, run by the same job that archives.
+- Notion stays truthful: a soft delete marks the Notion row Deleted, and restoring flips it back
+  to its real status rather than leaving a lie in the backup.
+- Undo also covers **completing** a task and **clearing a timer**, since those are the other two
+  actions that silently destroy state.
+
+### 2.5 Notifications
+The rules engine already knows when something deserves attention. Notifications are that
+knowledge, pushed.
+
+| Type | Fires when |
+|---|---|
+| Morning digest | Daily at your chosen time: due today, start now, overdue count, and whether today is already over capacity |
+| Start now | A planned start arrives, or remaining work stops fitting before the deadline |
+| Due soon | Configurable lead times before a deadline (default 24h and 2h) |
+| Became overdue | A deadline passes with the task unfinished |
+| Priority escalated | Computed priority rises — Low→Medium, Medium→High — with the reason |
+| At risk | An in-progress task can no longer fit before its deadline |
+| Day over capacity | Planned work for a day exceeds the free time left in it |
+| Scan results | The morning calendar scan found tasks worth confirming |
+| Evening wrap *(optional)* | What you logged, what slipped, tomorrow's first start |
+
+Controls: per-type on/off, per-category mute, digest time, lead times, and **quiet hours that
+reuse your existing day-start and day-end** so nothing arrives at 3am — anything firing inside
+quiet hours queues to the next window. Snooze directly from the notification.
+
+Two consequences worth stating plainly:
+- **Priority is currently computed and never stored.** Detecting an *escalation* means
+  persisting the last level you were told about, per task, so the scheduler can recompute and
+  compare. A new column and a small ledger, not a redesign.
+- **A `notifications_sent` ledger is mandatory**, keyed on task + type + threshold. Without it a
+  scheduler running every few minutes will tell you the same thing over and over, which is the
+  most common way notification systems become unusable and then muted forever.
+
+The pure `domain/` layer pays for itself here: the same priority and free-time code runs
+unchanged inside a scheduled Deno function, so the server can never disagree with the UI about
+whether something is High.
+
+### 2.6 Channels
+**Telegram as primary**, which is the right instinct:
+- Delivers reliably on iPhone with no Apple push entitlement, no PWA install requirement, and no
+  browser permission prompt that can be lost.
+- Two-way, so the same channel doubles as an input method.
+- Free, with a stable API.
+
+Also planned:
+- **Email**, for the morning digest only — cheap, and a sane fallback if Telegram is down. Not
+  for time-sensitive alerts.
+- **Web push**, as a later addition. Honest caveat: on iOS it works only for a PWA actually
+  added to the home screen, and the permission is easy to lose. Fine as a secondary channel,
+  wrong as the only one.
+
+### 2.7 Telegram bot
+
+**Setup and binding.** Bot created through BotFather, token held in Supabase Vault. Linking uses
+a one-time deep link (`t.me/<bot>?start=<nonce>`) so the chat is tied to your account, and the
+bot ignores every message from an unbound chat. The webhook is registered with Telegram's
+`secret_token` and the function rejects any request lacking the matching header — without that,
+anyone who learns the URL can post fake updates into your task list.
+
+**Text input.** A plain message runs through **the same capture parser the web app uses**, so
+`tmr 5pm`, `~3h` and `#school` behave identically in both places. The bot replies with what it
+understood plus an inline keyboard: **Add · Edit · Discard**. Nothing is created without that
+tap — the gate you asked for. Edit offers two routes: reply in natural language ("due friday
+instead, 2h") to amend the draft, or tap through to the web editor prefilled.
+
+**Photo input.** Send a photo of an assignment brief, a syllabus, a whiteboard or a printed
+timetable. The bot fetches the largest available size, passes it to a vision model, and extracts
+task details. Because one photo often contains several tasks, it proposes a **list** — each item
+individually confirmable, dismissable and editable before it is added. Same gate: nothing enters
+Daybook unconfirmed.
+
+**Commands.** A small, memorable set rather than a CLI: `/today`, `/next`, `/overdue`,
+`/done <n>`, `/timer <n>`, `/snooze`, `/link`, `/help`.
+
+**Drafts** live in their own table with an expiry, so an unconfirmed proposal from three days ago
+cannot be added by a stray tap.
+
+Three things to be clear-eyed about:
+- **Photo intake needs an API key.** Text capture works keyless because the parser is
+  rule-based; vision has no offline substitute. Until a key exists the bot says so plainly and
+  offers to attach the photo to a task you fill in yourself, rather than failing quietly.
+- **Task titles will pass through Telegram's servers**, and photos sent for extraction reach the
+  model provider. Both are reasonable, and both should be a conscious choice rather than a
+  surprise discovered later.
+- **Rate limits** are roughly one message per second per chat, so the digest and any multi-task
+  photo reply must batch into one message rather than firing one per item.
+
+---
+
+## 3. Target architecture
 
 ```
 ynscancode/daybook
@@ -195,7 +346,10 @@ ynscancode/daybook
 │      ├─ calendar-sync/   iCloud CalDAV (primary) | Google OAuth (fallback)
 │      ├─ notion-backup/   backup + archive + pending deletes
 │      ├─ ai-fill/         Anthropic proxy; returns {disabled:true} with no key
-│      └─ inbox-scan/      calendar → proposed tasks (phase 8)
+│      ├─ inbox-scan/      calendar → proposed tasks, heuristic-first
+│      ├─ notify-run/      scheduled: evaluate rules, dedupe, dispatch
+│      ├─ notify-digest/   scheduled: morning digest, evening wrap
+│      └─ telegram-hook/   inbound webhook: text, photos, commands, callbacks
 └─ docs/
 ```
 
@@ -218,7 +372,7 @@ it in Tailwind would cost days and lose the design.
 
 | Table | Purpose |
 |---|---|
-| `tasks` | the model above; `updated_at` trigger; indexes on `(user_id, due)`, `(user_id, completed_at)` |
+| `tasks` | the model above plus `priority_mode`, `priority_manual`, `deleted_at`, `last_notified_priority`; `updated_at` trigger; indexes on `(user_id, due)`, `(user_id, completed_at)`, a partial index excluding soft-deleted rows, and a GIN index over title+notes for search |
 | `task_archive` | completed tasks past the threshold; still queried by Insights |
 | `categories` | id, name, colour, sort order |
 | `settings` | one row per user: buffer, highDays, medDays, wakeStart, wakeEnd, archiveDays, hiddenCals, lastBackupAt, lastArchiveRun |
@@ -227,6 +381,10 @@ it in Tailwind would cost days and lose the design.
 | `inbox_items` | proposed tasks with kind, reason, status, `task_id` |
 | `scan_state` | last scan time, recurring-event summary |
 | `notion_pending_deletes` | retry queue, promoted out of the settings blob |
+| `notification_prefs` | per-type toggles, digest time, lead times, quiet hours, muted categories |
+| `notifications_sent` | dedupe ledger keyed on task + type + threshold |
+| `telegram_links` | chat_id ↔ user_id binding, link nonces, bound-at |
+| `task_drafts` | unconfirmed proposals from the bot, with source (text / photo) and expiry |
 
 Secrets — the Apple app-specific password, the Notion token, the Anthropic key — live in
 Supabase Vault and are read only inside Edge Functions. They never reach the browser.
@@ -309,7 +467,7 @@ history, not from AI.
 
 ---
 
-## 3. Phases
+## 4. Phases
 
 Each phase ends with something runnable. Phase 2 is the first point at which Daybook is usable
 for real work.
@@ -317,15 +475,16 @@ for real work.
 | # | Phase | Contents | Done when |
 |---|---|---|---|
 | 0 | Scaffold | Vite + React + TS, ESLint, Prettier, Vitest, GitHub Actions; Supabase project and local CLI; migrations for every table with RLS; Google sign-in | `npm run dev` serves an authenticated empty shell; `npm test` green |
-| 1 | Domain | Port `task`, `priority`, `freetime`, `capture`, `metrics`, `format` as pure modules; **unit tests first** — autoPri at every boundary, attention across the buffer, freeMin against overlapping and all-day events, and ~60 capture-parser cases drawn from the formats listed above | 100% of the exported domain surface covered; no React or Supabase import anywhere under `domain/` |
-| 2 | Core app | Token CSS, shell, tabs, bottom nav, sheets, toasts; Tasks view with filters, sorting, grouping, rows; the full editor including the time sanity checker; timers with the focus bar and single-timer rule; store, write queue, realtime, offline banner | You can run your real task list on it |
-| 3 | Dashboard + Calendar | Stat strip, focus cards, agenda with the now line, priority panels, week-load bars; week-grid calendar reading `calendar_events`; Settings with categories, planning rules, calendar visibility | Dashboard matches the artifact's at identical data |
+| 1 | Domain | Port `task`, `priority`, `freetime`, `capture`, `metrics`, `format` as pure modules, now including **effective priority** (manual override beating auto) and **configurable rules** read from settings rather than hardcoded; **unit tests first** — every priority boundary, attention across the buffer, freeMin against overlapping and all-day events, ~60 capture-parser cases | 100% of the exported domain surface covered; no React or Supabase import anywhere under `domain/` |
+| 2 | Core app | Token CSS, shell, tabs, bottom nav, sheets, toasts; Tasks view with filters, sorting, grouping, rows; **search**; the full editor including the time sanity checker and the **four-way priority control**; **soft delete with double confirmation and undo**; timers with the focus bar and single-timer rule; store, write queue, realtime, offline banner | You can run your real task list on it, and nothing you do is unrecoverable |
+| 3 | Dashboard + Calendar + Settings | Stat strip, focus cards, agenda with the now line, priority panels, week-load bars; week-grid calendar reading `calendar_events`; Settings with categories, **editable priority rules and their live preview**, planning rules, calendar visibility, **Trash** | Dashboard matches the artifact's at identical data; editing a priority rule visibly re-sorts the list |
 | 4 | Calendar sync | `calendar-sync` Edge Function; `icloud-caldav` provider; credential capture and Vault storage; 10-minute schedule; reconnect states; `google` provider behind the same interface | Real iCloud events drive free-time maths end to end |
-| 5 | Insights + archive | All eight KPIs, narrative lines, both charts, the completed table; archive table and its inclusion in metrics | Figures match hand-computed values on seeded data |
-| 6 | Notion | `notion-backup` function: batched creates, delta updates, archive-only-after-success, deletion marking, retry queue, 20-hour auto-run, per-error messaging | A task edited here appears correctly in Notion; a forced failure archives nothing |
-| 7 | Capture + AI | Capture bar with live chips, `fitText` on add, local category guess, keyless estimator; full AI pipeline returning `{disabled:true}` | Every parser format works; adding a key activates AI with no code change |
-| 8 | Inbox + scan | `inbox_items` and `scan_state` tables; the inbox panel with add / not-a-task / tick-off / promote-to-task; the `inbox-scan` scheduled job with heuristic classification, stable per-occurrence keys and idempotent re-scans; recurring-event summarisation; optional AI classification when a key exists | A morning scan of a real calendar proposes the right tasks, and re-running it never re-proposes a handled item |
-| 9 | Ship | PWA manifest and service worker, `#add` shortcut, deploy, offline shell | Installs on iPhone; the home-screen shortcut opens capture focused |
+| 5 | Insights + archive | All eight KPIs, narrative lines, both charts, the completed table; archive table and its inclusion in metrics; soft-deleted rows excluded everywhere | Figures match hand-computed values on seeded data |
+| 6 | Notifications + Telegram | `notification_prefs`, `notifications_sent`, `telegram_links`; `notify-run` and `notify-digest` on pg_cron; the domain layer running server-side so server and UI always agree; quiet hours, dedupe, snooze; Telegram bot with secret-token webhook verification, nonce binding, outbound delivery, inbound text capture through the shared parser, the Add/Edit/Discard gate, and the command set | A real deadline produces exactly one well-timed message; a task typed into Telegram only lands after you tap Add |
+| 7 | Notion | `notion-backup` function: batched creates, delta updates, archive-only-after-success, deletion and restoration marking, retry queue, 20-hour auto-run, per-error messaging | A task edited here appears correctly in Notion; a forced failure archives nothing; a restore un-marks it |
+| 8 | Capture + AI | Capture bar with live chips, `fitText` on add, local category guess, keyless estimator; full AI pipeline returning `{disabled:true}`; **Telegram photo intake** with multi-task extraction, per-item confirmation and honest keyless degradation | Every parser format works; adding a key activates AI fill and photo intake with no code change |
+| 9 | Inbox + scan | `inbox_items` and `scan_state`; the inbox panel with add / not-a-task / tick-off / promote-to-task; the `inbox-scan` scheduled job with heuristic classification, stable per-occurrence keys and idempotent re-scans; recurring-event summarisation; optional AI classification when a key exists | A morning scan of a real calendar proposes the right tasks, and re-running it never re-proposes a handled item |
+| 10 | Ship | PWA manifest and service worker, `#add` shortcut, deploy, offline shell; web push as an optional secondary channel | Installs on iPhone; the home-screen shortcut opens capture focused |
 
 ### Data migration — not needed
 Confirmed: the artifact holds no tasks worth keeping. No export or import step, and no
@@ -334,29 +493,31 @@ migration script. The new app starts from an empty database, and the 5-task exam
 
 ---
 
-## 4. Beyond parity
+## 5. Beyond parity
 
-Flagged, not assumed. "A full task tracker" could reasonably mean some of these; none are in
-the phases above and none will be built without your say-so.
+Flagged, not assumed. None are in the phases above; none get built without your say-so.
 
-- **Recurring tasks.** The artifact detects recurrence in calendar events but can never create a
-  repeating task. The most conspicuous gap for a real tracker.
+- **Recurring tasks.** Now the largest remaining gap, and more valuable than before: the scan
+  recognises recurring *events* and notifications will fire on schedules, yet nothing can create
+  a repeating *task*. A weekly reading or a monthly report still has to be re-entered by hand.
 - **Subtasks or checklists**, with progress rolling up from children.
-- **Search** across titles and notes — there is none today.
-- **Undo.** Deletion is two-tap confirm with no recovery; a soft-delete trash plus undo toast is
-  strictly safer.
-- **Manual priority override.** Priority is 100% automatic by design, which is a real strength,
-  but there is no way to pin something urgent that the rules do not see.
-- **Time blocking.** `fitText` already computes which free block a task fits into — actually
-  *writing* that block to your calendar is a small step with a large payoff.
-- **Reminders and push notifications**, for planned starts and approaching deadlines.
-- Multiple tags alongside the single category; dependencies and blocked-by; multi-select bulk
-  edit; keyboard shortcuts beyond Escape; attachments and links; CSV and ICS export; full
-  offline-first with background sync.
+- **Time blocking.** `fitText` already computes which free block a task fits into; actually
+  *writing* that block back to your calendar is a small step with a large payoff — and it would
+  make the start-now notification far more actionable.
+- **Multiple tags** alongside the single category.
+- **Dependencies and blocked-by**, so a task cannot demand attention before its predecessor is
+  done.
+- **Multi-select bulk edit** — reschedule or recategorise several tasks at once.
+- **Keyboard shortcuts** beyond search and Escape.
+- **Attachments and links** on a task (the Telegram photo path makes this more tempting, since
+  the source image is often worth keeping).
+- **CSV and ICS export.**
+- **Full offline-first** with background sync and conflict resolution, rather than an offline
+  shell.
 
 ---
 
-## 5. Verification
+## 6. Verification
 
 **Domain (phase 1, and continuously).** Vitest unit tests are the backbone. Table-driven cases
 for `autoPri` at each threshold boundary and for the "remaining ≥ time left" escalation; for
@@ -386,6 +547,29 @@ and other people's meetings are not proposed, and that deadline-shaped entries a
 idempotency test that matters most — tick off, add and dismiss one item each, re-run the scan,
 and assert none of the three reappears and that `scan_state` advances. Re-run again with an
 event's time changed and assert it is treated as the same occurrence, not a new proposal.
+
+**Priority and deletion (phase 2–3).** Assert manual override beats auto everywhere priority is
+consumed — row, sort, group, Notion payload, notification eligibility — and that reverting to
+Auto restores the computed level. Edit each priority rule and assert the whole list re-sorts and
+the Settings preview counts match. For deletion: soft-delete a task and assert it leaves every
+view *and* every Insights figure while the row persists; undo and assert full restoration;
+let the 30-day window lapse and assert hard deletion; confirm a restore un-marks the Notion row
+rather than leaving it Deleted.
+
+**Notifications (phase 6).** The dedupe ledger is the thing most likely to fail in a way you
+only notice after it has annoyed you, so test it hardest: run the scheduler repeatedly over
+unchanged data and assert exactly zero repeat sends. Assert a notification firing inside quiet
+hours queues to the next window rather than being dropped or delivered. Assert priority
+escalation fires once per transition, not once per scheduler tick, and that a manually pinned
+task produces no escalation messages. Assert snooze suppresses for exactly its interval. Use a
+frozen clock throughout.
+
+**Telegram (phase 6, 8).** Post a forged update with no secret-token header and assert rejection.
+Post from an unbound chat and assert it is ignored. Send a message with a parseable task and
+assert **nothing is written to `tasks`** until the Add callback arrives — the gate is the whole
+point, so it gets an explicit negative test. Assert an expired draft cannot be confirmed. Assert
+a multi-task photo reply arrives as one batched message, not one per item, and that with no API
+key the bot explains itself instead of failing silently.
 
 **Parity (before shipping).** Load identical data into both the artifact and the new app side by
 side and compare, screen by screen: the stat strip, each dashboard panel's membership and order,
